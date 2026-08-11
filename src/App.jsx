@@ -7,7 +7,7 @@ import {
   COMPOSE_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
 } from './prompts.js'
-import { generateImage, getWorkerUrl, setWorkerUrl } from './api.js'
+import { generateImage, getApiKey, setApiKey } from './api.js'
 
 // ---------------------------------------------------------------------------
 
@@ -40,10 +40,10 @@ async function fileToDataUrl(file, maxDim = 1600) {
   return canvas.toDataURL('image/jpeg', 0.92)
 }
 
-// Budżet bajtowy na CAŁE wejście żądania: Workers (free plan) zrywa
-// wychodzące żądania tuż powyżej 1 MiB, więc suma obrazów musi zostać
-// wyraźnie poniżej. Dociskamy schodkowo, aż suma zmieści się w budżecie.
-async function fitBudget(images, budget = 800_000) {
+// Budżet bajtowy na CAŁE wejście żądania. Przy bezpośrednim wołaniu API
+// Google limit żądania to ~20 MB, budżet 6 MB zostawia zapas i w praktyce
+// nie wymusza dodatkowej kompresji ponad standardowe 1600 px.
+async function fitBudget(images, budget = 6_000_000) {
   const steps = [
     [1400, 0.85],
     [1280, 0.78],
@@ -91,7 +91,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v1.6'
+const APP_VERSION = 'v2.0'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
@@ -127,7 +127,7 @@ function loadPrompts() {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const [workerUrl, setWorkerUrlState] = useState(getWorkerUrl())
+  const [apiKey, setApiKeyState] = useState(getApiKey())
   const [packshot, setPackshot] = useState(null)
   const [plate, setPlate] = useState(null)
   const [plateBusy, setPlateBusy] = useState(false)
@@ -172,9 +172,9 @@ export default function App() {
 
   // --- ustawienia ----------------------------------------------------------
 
-  const saveWorker = (v) => {
-    setWorkerUrlState(v)
-    setWorkerUrl(v)
+  const saveApiKey = (v) => {
+    setApiKeyState(v)
+    setApiKey(v)
   }
 
   // --- plate ---------------------------------------------------------------
@@ -309,14 +309,19 @@ export default function App() {
       <section className="card">
         <h2>Ustawienia</h2>
         <label>
-          Adres Cloudflare Workera
+          Klucz API Gemini (Google AI Studio)
           <input
-            type="url"
-            placeholder="https://radiator-studio.twoj-worker.workers.dev"
-            value={workerUrl}
-            onChange={(e) => saveWorker(e.target.value)}
+            type="password"
+            placeholder="AIza..."
+            value={apiKey}
+            onChange={(e) => saveApiKey(e.target.value)}
           />
         </label>
+        <p className="hint">
+          Klucz zostaje wyłącznie w tej przeglądarce (localStorage), appka woła
+          API Google bezpośrednio. W Google Cloud Console ogranicz klucz do
+          witryny https://adiutant-tech.github.io/* i do Generative Language API.
+        </p>
       </section>
 
       <section className="card">

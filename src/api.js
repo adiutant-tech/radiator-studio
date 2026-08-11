@@ -1,14 +1,23 @@
-// Klient Workera. Worker trzyma GEMINI_API_KEY i woła
-// gemini-2.5-flash-image:generateContent.
+// Klient Gemini: przeglądarka woła API Google BEZPOŚREDNIO, bez Workera.
+// Tor Cloudflare Workers -> Google zrywał połączenia przy żądaniach z
+// obrazami niezależnie od rozmiaru, więc został wycięty z architektury.
+//
+// Klucz jest wpisywany w Ustawieniach appki i trzymany wyłącznie w
+// localStorage tej przeglądarki. NIGDY nie wpisuj klucza do kodu ani repo.
+// W Google Cloud Console ogranicz klucz:
+//  - Application restrictions -> Websites -> https://adiutant-tech.github.io/*
+//  - API restrictions -> Generative Language API
 
-const LS_KEY = 'radiator-studio-worker-url'
+const LS_KEY = 'radiator-studio-gemini-key'
+const MODEL = 'gemini-2.5-flash-image'
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
-export function getWorkerUrl() {
+export function getApiKey() {
   return localStorage.getItem(LS_KEY) || ''
 }
 
-export function setWorkerUrl(url) {
-  localStorage.setItem(LS_KEY, url.trim().replace(/\/$/, ''))
+export function setApiKey(key) {
+  localStorage.setItem(LS_KEY, key.trim())
 }
 
 // dataURL -> {mimeType, data}
@@ -24,11 +33,9 @@ export function splitDataUrl(dataUrl) {
  * @returns {Promise<string>} dataURL wygenerowanego obrazu
  */
 export async function generateImage(prompt, imageDataUrls = []) {
-  const base = getWorkerUrl()
-  if (!base) throw new Error('Brak adresu Workera. Uzupełnij go w ustawieniach.')
+  const key = getApiKey()
+  if (!key) throw new Error('Brak klucza Gemini. Uzupełnij go w ustawieniach.')
 
-  // Payload w natywnym formacie Gemini generateContent, Worker tylko
-  // dokleja klucz i przepuszcza bajty (proxy strumieniowe).
   const payload = JSON.stringify({
     contents: [
       {
@@ -44,22 +51,23 @@ export async function generateImage(prompt, imageDataUrls = []) {
     generationConfig: { responseModalities: ['IMAGE'] },
   })
 
-  // Zerwania połączenia z Gemini bywają przejściowe: jedna automatyczna
-  // ponowna próba po 2 s, dopiero potem błąd do UI.
+  // Jedna automatyczna ponowna próba po 2 s przy błędach przejściowych.
   let lastError
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await fetch(`${base}/generate`, {
+      const res = await fetch(GEMINI_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key,
+        },
         body: payload,
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = body?.error?.message || body?.error || `Worker odpowiedział ${res.status}`
+        const msg = body?.error?.message || `Gemini odpowiedziało ${res.status}`
         throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
       }
-      // Surowa odpowiedź Gemini: wyciągnij część z obrazem.
       const candidate = body?.candidates?.[0]
       const part = candidate?.content?.parts?.find((p) => p.inlineData || p.inline_data)
       const inline = part?.inlineData || part?.inline_data
@@ -71,7 +79,7 @@ export async function generateImage(prompt, imageDataUrls = []) {
       return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`
     } catch (e) {
       lastError = e
-      const transient = /network|connection|fetch|502|timeout/i.test(e.message)
+      const transient = /network|connection|fetch|502|timeout|overloaded|503/i.test(e.message)
       if (attempt === 1 && transient) {
         await new Promise((r) => setTimeout(r, 2000))
         continue
