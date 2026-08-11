@@ -40,11 +40,24 @@ async function fileToDataUrl(file, maxDim = 1600) {
   return canvas.toDataURL('image/jpeg', 0.92)
 }
 
-// Bezpiecznik bajtowy tuż przed wysyłką: cokolwiek powyżej ~900 KB
-// jest dociskane, niezależnie od źródła obrazu.
-async function ensureSmall(dataUrl) {
-  if (!dataUrl || dataUrl.length <= 900_000) return dataUrl
-  return recompress(dataUrl, 1600, 0.85)
+// Budżet bajtowy na CAŁE wejście żądania: Workers (free plan) zrywa
+// wychodzące żądania tuż powyżej 1 MiB, więc suma obrazów musi zostać
+// wyraźnie poniżej. Dociskamy schodkowo, aż suma zmieści się w budżecie.
+async function fitBudget(images, budget = 800_000) {
+  const steps = [
+    [1400, 0.85],
+    [1280, 0.78],
+    [1024, 0.7],
+    [896, 0.6],
+  ]
+  let out = [...images]
+  let s = 0
+  const total = () => out.reduce((n, d) => n + (d?.length || 0), 0)
+  while (total() > budget && s < steps.length) {
+    const [dim, q] = steps[s++]
+    out = await Promise.all(out.map((d) => recompress(d, dim, q)))
+  }
+  return out
 }
 
 // Przekodowuje dataURL (np. ciężki PNG z Gemini) do JPEG i skaluje do maxDim.
@@ -78,7 +91,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v1.5'
+const APP_VERSION = 'v1.6'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
@@ -197,9 +210,8 @@ export default function App() {
     cancelRef.current = false
     setRunning(true)
 
-    // bezpiecznik bajtowy na obu wejściach
-    const packshotSmall = await ensureSmall(packshot)
-    const plateSmall = await ensureSmall(plate)
+    // budżet bajtowy na oba wejścia łącznie (limit ~1 MiB na żądanie)
+    const [packshotSmall, plateSmall] = await fitBudget([packshot, plate])
 
     const init = {}
     for (const p of plan)
@@ -219,8 +231,8 @@ export default function App() {
       try {
         masterImg = await generateImage(firstPrompt, [packshotSmall, plateSmall])
         patchCell(firstId, { status: 'done', img: masterImg })
-        // do swapu zaworów kadr idzie jako wejście: przekoduj na lekki JPEG
-        masterImg = await recompress(masterImg)
+        // do swapu zaworów kadr idzie jako wejście: zmieść w budżecie
+        ;[masterImg] = await fitBudget([masterImg])
       } catch (e) {
         patchCell(firstId, { status: 'error', error: e.message })
         if (secondValve)
@@ -258,10 +270,7 @@ export default function App() {
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt })
     try {
-      const img = await generateImage(prompt, [
-        await ensureSmall(packshot),
-        await ensureSmall(plate),
-      ])
+      const img = await generateImage(prompt, await fitBudget([packshot, plate]))
       patchCell(id, { status: 'done', img })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
