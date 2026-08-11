@@ -1,7 +1,12 @@
-// Radiator Studio, Cloudflare Worker
-// Proxy do Gemini 2.5 Flash Image (Nano Banana). Klucz trzymany jako secret:
-//   wrangler secret put GEMINI_API_KEY
-// Opcjonalnie zawęź CORS przez var ALLOWED_ORIGIN w wrangler.toml.
+// Radiator Studio, Cloudflare Worker v2 (proxy strumieniowe)
+// Klient wysyła gotowy payload w formacie Gemini generateContent,
+// Worker dokleja klucz i przepuszcza bajty bez parsowania w obie strony.
+// Zero JSON.parse/stringify na megabajtowych ciałach = zero problemów
+// z limitem CPU i zrywaniem transferu.
+//
+// Klucz: wrangler secret put GEMINI_API_KEY
+// CORS: var ALLOWED_ORIGIN w wrangler.toml (po deployu frontu ustaw
+// na https://adiutant-tech.github.io)
 
 const MODEL = 'gemini-2.5-flash-image'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
@@ -17,10 +22,10 @@ function corsHeaders(env, request) {
   }
 }
 
-const json = (data, status, headers) =>
-  new Response(JSON.stringify(data), {
+const jsonError = (message, status, cors) =>
+  new Response(JSON.stringify({ error: { message } }), {
     status,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', ...cors },
   })
 
 export default {
@@ -31,30 +36,15 @@ export default {
 
     const url = new URL(request.url)
     if (request.method !== 'POST' || url.pathname !== '/generate') {
-      return json({ error: 'Użyj POST /generate' }, 404, cors)
+      return jsonError('Użyj POST /generate', 404, cors)
     }
     if (!env.GEMINI_API_KEY) {
-      return json({ error: 'Brak GEMINI_API_KEY w secrets Workera.' }, 500, cors)
+      return jsonError('Brak GEMINI_API_KEY w secrets Workera.', 500, cors)
     }
 
-    let body
-    try {
-      body = await request.json()
-    } catch {
-      return json({ error: 'Nieprawidłowy JSON.' }, 400, cors)
-    }
-
-    const { prompt, images = [] } = body
-    if (!prompt) return json({ error: 'Brak promptu.' }, 400, cors)
-    if (images.length > 4) return json({ error: 'Maksymalnie 4 obrazy wejściowe.' }, 400, cors)
-
-    // Kolejność ma znaczenie: obrazy jako [1], [2]..., potem tekst.
-    const parts = [
-      ...images.map((img) => ({
-        inline_data: { mime_type: img.mimeType, data: img.data },
-      })),
-      { text: prompt },
-    ]
+    console.log(
+      `[gen] pass-through, content-length=${request.headers.get('Content-Length') || '?'}`,
+    )
 
     let upstream
     try {
@@ -64,36 +54,19 @@ export default {
           'Content-Type': 'application/json',
           'x-goog-api-key': env.GEMINI_API_KEY,
         },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { responseModalities: ['IMAGE'] },
-        }),
+        body: request.body,
       })
     } catch (e) {
-      return json({ error: `Błąd połączenia z Gemini: ${e.message}` }, 502, cors)
+      console.log(`[gen] FETCH FAIL: ${e.name}: ${e.message}`)
+      return jsonError(`Błąd połączenia z Gemini: ${e.message}`, 502, cors)
     }
 
-    const data = await upstream.json().catch(() => null)
+    console.log(`[gen] upstream status=${upstream.status}`)
 
-    if (!upstream.ok) {
-      const msg = data?.error?.message || `Gemini odpowiedziało ${upstream.status}`
-      return json({ error: msg }, upstream.status, cors)
-    }
-
-    const candidate = data?.candidates?.[0]
-    const imagePart = candidate?.content?.parts?.find((p) => p.inlineData || p.inline_data)
-    const inline = imagePart?.inlineData || imagePart?.inline_data
-
-    if (!inline?.data) {
-      const reason =
-        candidate?.finishReason || data?.promptFeedback?.blockReason || 'nieznany powód'
-      return json({ error: `Model nie zwrócił obrazu (${reason}).` }, 502, cors)
-    }
-
-    return json(
-      { image: inline.data, mimeType: inline.mimeType || inline.mime_type || 'image/png' },
-      200,
-      cors,
-    )
+    // Odpowiedź też leci strumieniem, bez parsowania w Workerze.
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { 'Content-Type': 'application/json', ...cors },
+    })
   },
 }

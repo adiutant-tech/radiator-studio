@@ -78,7 +78,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v1.4'
+const APP_VERSION = 'v1.5'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
