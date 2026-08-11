@@ -27,21 +27,38 @@ export async function generateImage(prompt, imageDataUrls = []) {
   const base = getWorkerUrl()
   if (!base) throw new Error('Brak adresu Workera. Uzupełnij go w ustawieniach.')
 
-  const res = await fetch(`${base}/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt,
-      images: imageDataUrls.map(splitDataUrl),
-    }),
+  const payload = JSON.stringify({
+    prompt,
+    images: imageDataUrls.map(splitDataUrl),
   })
 
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(body.error || `Worker odpowiedział ${res.status}`)
+  // Zerwania połączenia z Gemini bywają przejściowe: jedna automatyczna
+  // ponowna próba po 2 s, dopiero potem błąd do UI.
+  let lastError
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(`${base}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body.error || `Worker odpowiedział ${res.status}`)
+      }
+      if (!body.image) {
+        throw new Error(body.error || 'Model nie zwrócił obrazu (możliwy filtr treści). Spróbuj ponownie.')
+      }
+      return `data:${body.mimeType || 'image/png'};base64,${body.image}`
+    } catch (e) {
+      lastError = e
+      const transient = /network|connection|fetch|502|timeout/i.test(e.message)
+      if (attempt === 1 && transient) {
+        await new Promise((r) => setTimeout(r, 2000))
+        continue
+      }
+      throw lastError
+    }
   }
-  if (!body.image) {
-    throw new Error(body.error || 'Model nie zwrócił obrazu (możliwy filtr treści). Spróbuj ponownie.')
-  }
-  return `data:${body.mimeType || 'image/png'};base64,${body.image}`
+  throw lastError
 }

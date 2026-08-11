@@ -1,7 +1,13 @@
 // ---------------------------------------------------------------------------
-// Radiator Studio, biblioteka promptów
+// Radiator Studio, domyślna biblioteka promptów
 // Silnik: Gemini 2.5 Flash Image (Nano Banana)
 // Zasada: model nie czyta negatywów, wszystkie zakazy pisane twierdząco.
+//
+// Wszystko poniżej to DOMYŚLNE wartości. Aplikacja pozwala je edytować w UI
+// (sekcja "Prompty"), edycje są zapisywane w localStorage przeglądarki.
+// Placeholdery w szablonach:
+//   {FINISH} - blok materiałowy wybranego finiszu
+//   {VALVE}  - opis materiału przyłączy (srebrne / złote)
 // ---------------------------------------------------------------------------
 
 // --- KROK 1: scene plate, puste wnętrze (generowany raz, cache'owany) -------
@@ -70,35 +76,23 @@ export const FINISHES = [
   },
 ]
 
-// --- KROK 2: kompozycja packshot + plate -------------------------------------
+// --- KROK 2: szablon kompozycji packshot + plate -----------------------------
 // image [1] = packshot produktu, image [2] = scene plate
 
-export function composePrompt(finishBlock, valveMaterial) {
-  return `Using image [1] as the exact product reference and image [2] as the room, place the cast iron radiator from image [1] into the room from image [2], standing on the parquet floor against the wall directly beneath the sash window.
+export const COMPOSE_TEMPLATE = `Using image [1] as the exact product reference and image [2] as the room, place the cast iron radiator from image [1] into the room from image [2], standing on the parquet floor against the wall directly beneath the sash window.
 
 Preserve the radiator from image [1] exactly as it is. Keep its silhouette, its proportions, the exact number of sections, the width and spacing of every section, the raised ornamental scrollwork on the two end sections, the plain smooth columns in between, the shape of the four curved decorative feet, and the round valve bosses at the bottom outer corners. The casting detail must match image [1] one to one. Do not redesign, simplify, stylise or embellish any part of it, and do not add ornament to the plain middle sections. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.
 
 It is a low, squat radiator, 510 mm tall, about knee height. The top of the radiator sits well below the window sill with a clear gap of at least 200 mm between them. Show it from a gentle three-quarter angle from the left, so the two-column depth is readable and the ornamental end section faces the camera.
 
-Connect it to the existing floor pipes with slim traditional angled radiator valves. The two valves and their visible connecting pipework are made of ${valveMaterial}. The valve metal contrasts cleanly with the radiator body.
+Connect it to the existing floor pipes with slim traditional angled radiator valves. The two valves and their visible connecting pipework are made of {VALVE}. The valve metal contrasts cleanly with the radiator body.
 
 Keep the room from image [2] completely unchanged. The wall colour, the window, the curtains, the parquet, the rug, the furniture at the frame edges, the camera position and the lens perspective all stay exactly as they are.
 
 Integrate the radiator into the scene photographically: the same soft overcast daylight from the left rakes across its front, revealing the ornamental relief through gentle directional shadow. Cast a soft shadow to the right along the floor and a tight dark contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the parquet onto the lower edges of the casting. Match the grain, colour temperature and depth of field of image [2] so the result reads as a single photograph.
 
-The finish of the radiator body: ${finishBlock}`
-}
+The finish of the radiator body: {FINISH}`
 
-// --- KROK 3a: swap finiszu (z zaakceptowanego mastera) -----------------------
+// --- KROK 3: szablon swapu przyłączy (z gotowego kadru) ----------------------
 
-export function finishSwapPrompt(finishBlock) {
-  return `Keep everything in this image identical: the room, the camera, the framing, the lighting, the shadows, the valves and pipework, and the radiator's exact geometry, section count and casting detail. Change only the surface finish of the radiator body to the following, and re-render its highlights and shadows so they are physically correct for that material:
-
-${finishBlock}`
-}
-
-// --- KROK 3b: swap przyłączy (z gotowego kadru w danym finiszu) --------------
-
-export function valveSwapPrompt(valveMaterial) {
-  return `Keep everything in this image absolutely identical: the room, the camera, the framing, the lighting, the radiator, its finish, its geometry, its section count and all of its casting detail. Change only the two radiator valves and their visible connecting pipework at the bottom outer corners. Their new material is ${valveMaterial}. Re-render the reflections and highlights on the valves and pipes so they are physically correct for that metal, and keep their shape, size and position exactly as they are.`
-}
+export const VALVE_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera, the framing, the lighting, the radiator, its finish, its geometry, its section count and all of its casting detail. Change only the two radiator valves and their visible connecting pipework at the bottom outer corners. Their new material is {VALVE}. Re-render the reflections and highlights on the valves and pipes so they are physically correct for that metal, and keep their shape, size and position exactly as they are.`

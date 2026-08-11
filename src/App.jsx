@@ -1,23 +1,42 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
   PLATE_PROMPT,
   FINISHES,
   VALVES,
-  composePrompt,
-  valveSwapPrompt,
+  COMPOSE_TEMPLATE,
+  VALVE_SWAP_TEMPLATE,
 } from './prompts.js'
 import { generateImage, getWorkerUrl, setWorkerUrl } from './api.js'
 
 // ---------------------------------------------------------------------------
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
+// Wczytuje plik i skaluje w dół do maxDim po dłuższym boku.
+// Duże packshoty (5-20 MB) potrafią zrywać połączenie Workera z Gemini,
+// a do kompozycji i tak wystarczy ~1600 px.
+async function fileToDataUrl(file, maxDim = 1600) {
+  const raw = await new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(r.result)
     r.onerror = reject
     r.readAsDataURL(file)
   })
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = reject
+    i.src = raw
+  })
+  if (Math.max(img.width, img.height) <= maxDim) return raw
+  const scale = maxDim / Math.max(img.width, img.height)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * scale)
+  canvas.height = Math.round(img.height * scale)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.92)
 }
 
 function download(dataUrl, name) {
@@ -29,25 +48,82 @@ function download(dataUrl, name) {
 
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
+// --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
+
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v1'
+
+function defaultPrompts() {
+  return {
+    plate: PLATE_PROMPT,
+    compose: COMPOSE_TEMPLATE,
+    swap: VALVE_SWAP_TEMPLATE,
+    finishes: Object.fromEntries(FINISHES.map((f) => [f.key, f.block])),
+    valves: { silver: VALVES.silver.material, gold: VALVES.gold.material },
+  }
+}
+
+function loadPrompts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROMPTS_LS_KEY))
+    if (!saved) return defaultPrompts()
+    const d = defaultPrompts()
+    return {
+      plate: saved.plate ?? d.plate,
+      compose: saved.compose ?? d.compose,
+      swap: saved.swap ?? d.swap,
+      finishes: { ...d.finishes, ...(saved.finishes || {}) },
+      valves: { ...d.valves, ...(saved.valves || {}) },
+    }
+  } catch {
+    return defaultPrompts()
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 export default function App() {
   const [workerUrl, setWorkerUrlState] = useState(getWorkerUrl())
   const [packshot, setPackshot] = useState(null)
   const [plate, setPlate] = useState(null)
-  const [platePrompt, setPlatePrompt] = useState(PLATE_PROMPT)
   const [plateBusy, setPlateBusy] = useState(false)
+
+  const [prompts, setPrompts] = useState(loadPrompts)
 
   const [selFinishes, setSelFinishes] = useState(FINISHES.map((f) => f.key))
   const [selValves, setSelValves] = useState(['silver', 'gold'])
 
-  // cells: { [id]: {status: 'pending'|'running'|'done'|'error', img, error} }
+  // cells: { [id]: {status, img, error, prompt} }
   const [cells, setCells] = useState({})
   const [running, setRunning] = useState(false)
   const cancelRef = useRef(false)
 
+  useEffect(() => {
+    localStorage.setItem(PROMPTS_LS_KEY, JSON.stringify(prompts))
+  }, [prompts])
+
   const patchCell = (id, patch) =>
     setCells((c) => ({ ...c, [id]: { ...(c[id] || {}), ...patch } }))
+
+  const setPrompt = (patch) => setPrompts((p) => ({ ...p, ...patch }))
+  const setFinishBlock = (key, text) =>
+    setPrompts((p) => ({ ...p, finishes: { ...p.finishes, [key]: text } }))
+  const setValveMaterial = (key, text) =>
+    setPrompts((p) => ({ ...p, valves: { ...p.valves, [key]: text } }))
+
+  const resetPrompts = () => {
+    if (confirm('Przywrócić wszystkie prompty do wartości domyślnych?')) {
+      setPrompts(defaultPrompts())
+    }
+  }
+
+  // Finalne prompty składane z szablonów. To dokładnie ten tekst idzie do modelu.
+  const buildComposePrompt = (finishKey, valveKey) =>
+    prompts.compose
+      .replaceAll('{FINISH}', prompts.finishes[finishKey])
+      .replaceAll('{VALVE}', prompts.valves[valveKey])
+
+  const buildSwapPrompt = (valveKey) =>
+    prompts.swap.replaceAll('{VALVE}', prompts.valves[valveKey])
 
   // --- ustawienia ----------------------------------------------------------
 
@@ -61,7 +137,7 @@ export default function App() {
   const generatePlate = async () => {
     setPlateBusy(true)
     try {
-      setPlate(await generateImage(platePrompt, []))
+      setPlate(await generateImage(prompts.plate, []))
     } catch (e) {
       alert(`Błąd generacji wnętrza: ${e.message}`)
     } finally {
@@ -74,7 +150,6 @@ export default function App() {
   const plan = useMemo(() => {
     // Na każdy finisz: pełna kompozycja z pierwszym wybranym wariantem
     // przyłączy, drugi wariant jako edycja (swap zaworów) z gotowego kadru.
-    // To trzyma spójność: oba warianty przyłączy dzielą identyczny kadr.
     const order = ['silver', 'gold'].filter((v) => selValves.includes(v))
     return selFinishes.map((fk) => ({ finishKey: fk, valveOrder: order }))
   }, [selFinishes, selValves])
@@ -97,24 +172,20 @@ export default function App() {
 
     for (const p of plan) {
       if (cancelRef.current) break
-      const finish = FINISHES.find((f) => f.key === p.finishKey)
       const [firstValve, secondValve] = p.valveOrder
       let masterImg = null
 
       // 1) pełna kompozycja: packshot + plate
-      const firstId = cellId(finish.key, firstValve)
-      patchCell(firstId, { status: 'running' })
+      const firstId = cellId(p.finishKey, firstValve)
+      const firstPrompt = buildComposePrompt(p.finishKey, firstValve)
+      patchCell(firstId, { status: 'running', prompt: firstPrompt })
       try {
-        masterImg = await generateImage(
-          composePrompt(finish.block, VALVES[firstValve].material),
-          [packshot, plate],
-        )
+        masterImg = await generateImage(firstPrompt, [packshot, plate])
         patchCell(firstId, { status: 'done', img: masterImg })
       } catch (e) {
         patchCell(firstId, { status: 'error', error: e.message })
-        // bez mastera nie ma z czego swapować drugiego wariantu
         if (secondValve)
-          patchCell(cellId(finish.key, secondValve), {
+          patchCell(cellId(p.finishKey, secondValve), {
             status: 'error',
             error: 'Pominięto: brak kadru bazowego dla tego finiszu.',
           })
@@ -123,13 +194,11 @@ export default function App() {
 
       // 2) swap przyłączy z gotowego kadru
       if (secondValve && !cancelRef.current) {
-        const secondId = cellId(finish.key, secondValve)
-        patchCell(secondId, { status: 'running' })
+        const secondId = cellId(p.finishKey, secondValve)
+        const swapPrompt = buildSwapPrompt(secondValve)
+        patchCell(secondId, { status: 'running', prompt: swapPrompt })
         try {
-          const img = await generateImage(
-            valveSwapPrompt(VALVES[secondValve].material),
-            [masterImg],
-          )
+          const img = await generateImage(swapPrompt, [masterImg])
           patchCell(secondId, { status: 'done', img })
         } catch (e) {
           patchCell(secondId, { status: 'error', error: e.message })
@@ -140,14 +209,11 @@ export default function App() {
   }
 
   const retryCell = async (finishKey, valveKey) => {
-    const finish = FINISHES.find((f) => f.key === finishKey)
     const id = cellId(finishKey, valveKey)
-    patchCell(id, { status: 'running', error: null })
+    const prompt = buildComposePrompt(finishKey, valveKey)
+    patchCell(id, { status: 'running', error: null, prompt })
     try {
-      const img = await generateImage(
-        composePrompt(finish.block, VALVES[valveKey].material),
-        [packshot, plate],
-      )
+      const img = await generateImage(prompt, [packshot, plate])
       patchCell(id, { status: 'done', img })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
@@ -198,7 +264,8 @@ export default function App() {
         <h2>Krok 1: Packshot produktu</h2>
         <p className="hint">
           Zdjęcie produktowe ze sklepu, najlepiej wycięte na białym tle. To jest
-          źródło geometrii odlewu, model ma zakaz jej zmieniania.
+          źródło geometrii odlewu, model ma zakaz jej zmieniania. Obraz jest
+          automatycznie skalowany do 1600 px przed wysyłką.
         </p>
         <input
           type="file"
@@ -216,14 +283,6 @@ export default function App() {
           Generowane raz i używane dla całej serii, to gwarantuje, że wszystkie
           warianty wyglądają na jedną sesję. Możesz też wgrać własne.
         </p>
-        <details>
-          <summary>Prompt wnętrza (edytowalny)</summary>
-          <textarea
-            rows={10}
-            value={platePrompt}
-            onChange={(e) => setPlatePrompt(e.target.value)}
-          />
-        </details>
         <div className="row">
           <button onClick={generatePlate} disabled={plateBusy}>
             {plateBusy ? 'Generuję wnętrze…' : 'Generuj wnętrze'}
@@ -241,6 +300,75 @@ export default function App() {
           </label>
         </div>
         {plate && <img className="preview wide" src={plate} alt="Scene plate" />}
+      </section>
+
+      <section className="card">
+        <h2>Prompty (edytowalne)</h2>
+        <p className="hint">
+          Dokładnie ten tekst idzie do modelu. W szablonach działają placeholdery:{' '}
+          <code>{'{FINISH}'}</code> jest zastępowany blokiem wybranego finiszu,{' '}
+          <code>{'{VALVE}'}</code> opisem materiału przyłączy. Zmiany zapisują się
+          automatycznie w tej przeglądarce.
+        </p>
+
+        <details>
+          <summary>Prompt wnętrza (scene plate)</summary>
+          <textarea
+            rows={12}
+            value={prompts.plate}
+            onChange={(e) => setPrompt({ plate: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Szablon kompozycji (packshot + wnętrze)</summary>
+          <textarea
+            rows={16}
+            value={prompts.compose}
+            onChange={(e) => setPrompt({ compose: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Szablon swapu przyłączy</summary>
+          <textarea
+            rows={5}
+            value={prompts.swap}
+            onChange={(e) => setPrompt({ swap: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Bloki finiszy (6)</summary>
+          {FINISHES.map((f) => (
+            <label key={f.key} className="block-label">
+              {f.label}
+              <textarea
+                rows={4}
+                value={prompts.finishes[f.key]}
+                onChange={(e) => setFinishBlock(f.key, e.target.value)}
+              />
+            </label>
+          ))}
+        </details>
+
+        <details>
+          <summary>Materiały przyłączy (2)</summary>
+          {Object.values(VALVES).map((v) => (
+            <label key={v.key} className="block-label">
+              {v.label}
+              <textarea
+                rows={2}
+                value={prompts.valves[v.key]}
+                onChange={(e) => setValveMaterial(v.key, e.target.value)}
+              />
+            </label>
+          ))}
+        </details>
+
+        <div className="row">
+          <button onClick={resetPrompts}>Przywróć domyślne</button>
+        </div>
       </section>
 
       <section className="card">
@@ -330,6 +458,12 @@ export default function App() {
                         <button onClick={() => retryCell(p.finishKey, v)}>Ponów</button>
                       </div>
                     </>
+                  )}
+                  {cell?.prompt && (
+                    <details className="prompt-details">
+                      <summary>Prompt użyty w tym kadrze</summary>
+                      <pre className="prompt-pre">{cell.prompt}</pre>
+                    </details>
                   )}
                 </div>
               )
