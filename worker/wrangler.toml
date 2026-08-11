@@ -1,0 +1,10 @@
+name = "radiator-studio"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+# Po deployu frontu na GitHub Pages zawęź CORS do jego adresu:
+# [vars]
+# ALLOWED_ORIGIN = "https://adiutant-tech.github.io"
+
+# Klucz wgrywasz komendą (nigdy w tym pliku):
+#   npx wrangler secret put GEMINI_API_KEY
