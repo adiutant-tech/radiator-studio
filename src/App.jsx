@@ -39,6 +39,27 @@ async function fileToDataUrl(file, maxDim = 1600) {
   return canvas.toDataURL('image/jpeg', 0.92)
 }
 
+// Przekodowuje dataURL (np. ciężki PNG z Gemini) do JPEG i skaluje do maxDim.
+// Obrazy wracające z modelu jako PNG ważą w base64 2-3 MB i przy ponownym
+// wysłaniu jako wejście potrafią zrywać połączenie Workera z Gemini.
+async function recompress(dataUrl, maxDim = 1600, quality = 0.9) {
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = reject
+    i.src = dataUrl
+  })
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * scale)
+  canvas.height = Math.round(img.height * scale)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
 function download(dataUrl, name) {
   const a = document.createElement('a')
   a.href = dataUrl
@@ -137,7 +158,8 @@ export default function App() {
   const generatePlate = async () => {
     setPlateBusy(true)
     try {
-      setPlate(await generateImage(prompts.plate, []))
+      const raw = await generateImage(prompts.plate, [])
+      setPlate(await recompress(raw))
     } catch (e) {
       alert(`Błąd generacji wnętrza: ${e.message}`)
     } finally {
@@ -182,6 +204,8 @@ export default function App() {
       try {
         masterImg = await generateImage(firstPrompt, [packshot, plate])
         patchCell(firstId, { status: 'done', img: masterImg })
+        // do swapu zaworów kadr idzie jako wejście: przekoduj na lekki JPEG
+        masterImg = await recompress(masterImg)
       } catch (e) {
         patchCell(firstId, { status: 'error', error: e.message })
         if (secondValve)
