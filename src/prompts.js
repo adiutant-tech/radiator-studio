@@ -93,6 +93,14 @@ Integrate the radiator into the scene photographically: the same soft overcast d
 
 The finish of the radiator body: {FINISH}`
 
-// --- KROK 3: szablon swapu przyłączy (z gotowego kadru) ----------------------
+// --- KROK 3a: szablon swapu finiszu (z kadru master) -------------------------
+// Cała seria dzieli jeden kadr: pierwszy finisz to pełna kompozycja,
+// każdy kolejny to edycja mastera zmieniająca wyłącznie lakier.
+
+export const FINISH_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera angle, the framing, the lighting, the shadows, the valves and pipework, and the radiator's exact geometry, its section count, its position in the room and all of its casting detail. Change only the surface finish of the radiator body to the following, re-rendering its highlights, sheen and shadows so they are physically correct for the new material:
+
+{FINISH}`
+
+// --- KROK 3b: szablon swapu przyłączy (z gotowego kadru) ---------------------
 
 export const VALVE_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera, the framing, the lighting, the radiator, its finish, its geometry, its section count and all of its casting detail. Change only the two radiator valves and their visible connecting pipework at the bottom outer corners. Their new material is {VALVE}. Re-render the reflections and highlights on the valves and pipes so they are physically correct for that metal, and keep their shape, size and position exactly as they are.`

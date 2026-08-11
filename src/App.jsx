@@ -5,6 +5,7 @@ import {
   FINISHES,
   VALVES,
   COMPOSE_TEMPLATE,
+  FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
 } from './prompts.js'
 import { generateImage, getApiKey, setApiKey } from './api.js'
@@ -91,7 +92,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v2.0'
+const APP_VERSION = 'v2.1'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
@@ -101,6 +102,7 @@ function defaultPrompts() {
   return {
     plate: PLATE_PROMPT,
     compose: COMPOSE_TEMPLATE,
+    finishSwap: FINISH_SWAP_TEMPLATE,
     swap: VALVE_SWAP_TEMPLATE,
     finishes: Object.fromEntries(FINISHES.map((f) => [f.key, f.block])),
     valves: { silver: VALVES.silver.material, gold: VALVES.gold.material },
@@ -115,6 +117,7 @@ function loadPrompts() {
     return {
       plate: saved.plate ?? d.plate,
       compose: saved.compose ?? d.compose,
+      finishSwap: saved.finishSwap ?? d.finishSwap,
       swap: saved.swap ?? d.swap,
       finishes: { ...d.finishes, ...(saved.finishes || {}) },
       valves: { ...d.valves, ...(saved.valves || {}) },
@@ -170,6 +173,9 @@ export default function App() {
   const buildSwapPrompt = (valveKey) =>
     prompts.swap.replaceAll('{VALVE}', prompts.valves[valveKey])
 
+  const buildFinishSwapPrompt = (finishKey) =>
+    prompts.finishSwap.replaceAll('{FINISH}', prompts.finishes[finishKey])
+
   // --- ustawienia ----------------------------------------------------------
 
   const saveApiKey = (v) => {
@@ -219,20 +225,30 @@ export default function App() {
         init[cellId(p.finishKey, v)] = { status: 'pending' }
     setCells(init)
 
+    // KADR MASTER: pierwszy finisz to jedyna pełna kompozycja w serii.
+    // Każdy kolejny finisz powstaje jako edycja mastera (zmiana samego
+    // lakieru), dzięki czemu cała seria dzieli identyczny kadr, kąt i światło.
+    let masterFrame = null
+
     for (const p of plan) {
       if (cancelRef.current) break
       const [firstValve, secondValve] = p.valveOrder
-      let masterImg = null
+      let frameImg = null
 
-      // 1) pełna kompozycja: packshot + plate
       const firstId = cellId(p.finishKey, firstValve)
-      const firstPrompt = buildComposePrompt(p.finishKey, firstValve)
+      const isMaster = !masterFrame
+      const firstPrompt = isMaster
+        ? buildComposePrompt(p.finishKey, firstValve)
+        : buildFinishSwapPrompt(p.finishKey)
+      const inputs = isMaster ? [packshotSmall, plateSmall] : [masterFrame]
+
       patchCell(firstId, { status: 'running', prompt: firstPrompt })
       try {
-        masterImg = await generateImage(firstPrompt, [packshotSmall, plateSmall])
-        patchCell(firstId, { status: 'done', img: masterImg })
-        // do swapu zaworów kadr idzie jako wejście: zmieść w budżecie
-        ;[masterImg] = await fitBudget([masterImg])
+        frameImg = await generateImage(firstPrompt, inputs)
+        patchCell(firstId, { status: 'done', img: frameImg })
+        // kadr posłuży jako wejście kolejnych edycji: zmieść w budżecie
+        ;[frameImg] = await fitBudget([frameImg])
+        if (isMaster) masterFrame = frameImg
       } catch (e) {
         patchCell(firstId, { status: 'error', error: e.message })
         if (secondValve)
@@ -243,13 +259,13 @@ export default function App() {
         continue
       }
 
-      // 2) swap przyłączy z gotowego kadru
+      // swap przyłączy z kadru tego finiszu
       if (secondValve && !cancelRef.current) {
         const secondId = cellId(p.finishKey, secondValve)
         const swapPrompt = buildSwapPrompt(secondValve)
         patchCell(secondId, { status: 'running', prompt: swapPrompt })
         try {
-          const img = await generateImage(swapPrompt, [masterImg])
+          const img = await generateImage(swapPrompt, [frameImg])
           patchCell(secondId, { status: 'done', img })
         } catch (e) {
           patchCell(secondId, { status: 'error', error: e.message })
@@ -390,6 +406,15 @@ export default function App() {
             rows={16}
             value={prompts.compose}
             onChange={(e) => setPrompt({ compose: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Szablon swapu finiszu (seria z jednego kadru)</summary>
+          <textarea
+            rows={5}
+            value={prompts.finishSwap}
+            onChange={(e) => setPrompt({ finishSwap: e.target.value })}
           />
         </details>
 
