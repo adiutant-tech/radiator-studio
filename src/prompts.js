@@ -76,16 +76,29 @@ export const FINISHES = [
   },
 ]
 
+// --- Warianty szerokości: liczba sekcji --------------------------------------
+
+export const SECTION_VARIANTS = [
+  { sections: 4, width: 362, btu: 1652 },
+  { sections: 6, width: 518, btu: 2478 },
+  { sections: 8, width: 674, btu: 3304 },
+  { sections: 10, width: 830, btu: 4127 },
+  { sections: 12, width: 986, btu: 4956 },
+  { sections: 14, width: 1142, btu: 5782 },
+]
+
 // --- KROK 2: szablon kompozycji packshot + plate -----------------------------
 // image [1] = packshot produktu, image [2] = scene plate
+// Placeholdery: {SECTIONS} liczba sekcji, {WIDTH_MM} szerokość w mm,
+// {VALVE} materiał przyłączy, {FINISH} blok finiszu.
 
 export const COMPOSE_TEMPLATE = `Using image [1] as the exact product reference and image [2] as the room, place the cast iron radiator from image [1] into the room from image [2], standing on the parquet floor against the wall directly beneath the sash window.
 
-Preserve the radiator from image [1] exactly as it is. Keep its silhouette, its proportions, the exact number of sections, the width and spacing of every section, the raised ornamental scrollwork on the two end sections, the plain smooth columns in between, the shape of the four curved decorative feet, and the round valve bosses at the bottom outer corners. The casting detail must match image [1] one to one. Do not redesign, simplify, stylise or embellish any part of it, and do not add ornament to the plain middle sections. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.
+Reproduce the radiator design from image [1] one to one: the silhouette, the proportions of a single section, the raised ornamental scrollwork cast into every single section, the shape of the four curved decorative feet, and the round valve bosses at the bottom outer corners. Do not redesign, simplify, stylise or omit the ornament on any section; every section carries the same raised relief pattern as in image [1]. Build the radiator with exactly {SECTIONS} sections: repeat the identical section design so the radiator has {SECTIONS} evenly spaced sections and is approximately {WIDTH_MM} mm wide. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.
 
-It is a low, squat radiator, 510 mm tall, about knee height. The top of the radiator sits well below the window sill with a clear gap of at least 200 mm between them. Show it from a gentle three-quarter angle from the left, so the two-column depth is readable and the ornamental end section faces the camera.
+It is a low radiator, about knee height. The top of the radiator sits well below the window sill with a clear gap between them. Show it from a gentle three-quarter angle from the left, so the two-column depth is readable.
 
-Connect it to the existing floor pipes with slim traditional angled radiator valves. The two valves and their visible connecting pipework are made of {VALVE}. The valve metal contrasts cleanly with the radiator body.
+Connect the radiator to the two pipes rising from the floorboards using a pair of traditional angled radiator valves. There are exactly two valves, one at each bottom outer corner of the radiator, never one and never more than two. Each valve stands on its own pipe coming vertically out of the floor and joins the radiator at the bottom of its end section, the left valve at the left end, the right valve at the right end. Both valves are identical in style and size, and both are fully connected, nothing floats loose in the room. Both valves and their visible pipework are made of {VALVE}. The valve metal contrasts cleanly with the radiator body.
 
 Keep the room from image [2] completely unchanged. The wall colour, the window, the curtains, the parquet, the rug, the furniture at the frame edges, the camera position and the lens perspective all stay exactly as they are.
 
@@ -103,4 +116,4 @@ export const FINISH_SWAP_TEMPLATE = `Keep everything in this image absolutely id
 
 // --- KROK 3b: szablon swapu przyłączy (z gotowego kadru) ---------------------
 
-export const VALVE_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera, the framing, the lighting, the radiator, its finish, its geometry, its section count and all of its casting detail. Change only the two radiator valves and their visible connecting pipework at the bottom outer corners. Their new material is {VALVE}. Re-render the reflections and highlights on the valves and pipes so they are physically correct for that metal, and keep their shape, size and position exactly as they are.`
+export const VALVE_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera, the framing, the lighting, the radiator, its finish, its geometry, its section count and all of its casting detail. The radiator has exactly two valves, one at each bottom outer corner, each standing on its own pipe rising from the floor and connected to the radiator. Change only the material of these two valves and their visible pipework to {VALVE}. Re-render the reflections and highlights on the valves and pipes so they are physically correct for that metal, and keep their shape, size and position exactly as they are. Do not add, remove or move any valve.`

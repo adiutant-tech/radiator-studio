@@ -4,6 +4,7 @@ import {
   PLATE_PROMPT,
   FINISHES,
   VALVES,
+  SECTION_VARIANTS,
   COMPOSE_TEMPLATE,
   FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
@@ -92,11 +93,15 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v2.1'
+const APP_VERSION = 'v2.3'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v1'
+// v2: nowe domyślne (ornament na każdej sekcji, rygor dwóch zaworów,
+// placeholdery {SECTIONS}/{WIDTH_MM}). Zmiana klucza celowo porzuca stare
+// edycje z localStorage, żeby wszyscy wystartowali od aktualnych domyślnych.
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v2'
+const SECTIONS_LS_KEY = 'radiator-studio-sections'
 
 function defaultPrompts() {
   return {
@@ -137,13 +142,28 @@ export default function App() {
 
   const [prompts, setPrompts] = useState(loadPrompts)
 
+  const [sections, setSections] = useState(() => {
+    const saved = Number(localStorage.getItem(SECTIONS_LS_KEY))
+    return SECTION_VARIANTS.some((v) => v.sections === saved) ? saved : 10
+  })
+  const sectionVariant = SECTION_VARIANTS.find((v) => v.sections === sections)
+
   const [selFinishes, setSelFinishes] = useState(FINISHES.map((f) => f.key))
   const [selValves, setSelValves] = useState(['silver', 'gold'])
 
   // cells: { [id]: {status, img, error, prompt} }
   const [cells, setCells] = useState({})
   const [running, setRunning] = useState(false)
+  const [lightbox, setLightbox] = useState(null)
   const cancelRef = useRef(false)
+
+  // Esc zamyka podgląd
+  useEffect(() => {
+    if (!lightbox) return
+    const onKey = (e) => e.key === 'Escape' && setLightbox(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightbox])
 
   useEffect(() => {
     localStorage.setItem(PROMPTS_LS_KEY, JSON.stringify(prompts))
@@ -164,11 +184,18 @@ export default function App() {
     }
   }
 
+  const saveSections = (n) => {
+    setSections(n)
+    localStorage.setItem(SECTIONS_LS_KEY, String(n))
+  }
+
   // Finalne prompty składane z szablonów. To dokładnie ten tekst idzie do modelu.
   const buildComposePrompt = (finishKey, valveKey) =>
     prompts.compose
       .replaceAll('{FINISH}', prompts.finishes[finishKey])
       .replaceAll('{VALVE}', prompts.valves[valveKey])
+      .replaceAll('{SECTIONS}', String(sectionVariant.sections))
+      .replaceAll('{WIDTH_MM}', String(sectionVariant.width))
 
   const buildSwapPrompt = (valveKey) =>
     prompts.swap.replaceAll('{VALVE}', prompts.valves[valveKey])
@@ -242,7 +269,7 @@ export default function App() {
         : buildFinishSwapPrompt(p.finishKey)
       const inputs = isMaster ? [packshotSmall, plateSmall] : [masterFrame]
 
-      patchCell(firstId, { status: 'running', prompt: firstPrompt })
+      patchCell(firstId, { status: 'running', prompt: firstPrompt, sections })
       try {
         frameImg = await generateImage(firstPrompt, inputs)
         patchCell(firstId, { status: 'done', img: frameImg })
@@ -263,7 +290,7 @@ export default function App() {
       if (secondValve && !cancelRef.current) {
         const secondId = cellId(p.finishKey, secondValve)
         const swapPrompt = buildSwapPrompt(secondValve)
-        patchCell(secondId, { status: 'running', prompt: swapPrompt })
+        patchCell(secondId, { status: 'running', prompt: swapPrompt, sections })
         try {
           const img = await generateImage(swapPrompt, [frameImg])
           patchCell(secondId, { status: 'done', img })
@@ -284,7 +311,7 @@ export default function App() {
     }
     const id = cellId(finishKey, valveKey)
     const prompt = buildComposePrompt(finishKey, valveKey)
-    patchCell(id, { status: 'running', error: null, prompt })
+    patchCell(id, { status: 'running', error: null, prompt, sections })
     try {
       const img = await generateImage(prompt, await fitBudget([packshot, plate]))
       patchCell(id, { status: 'done', img })
@@ -298,7 +325,9 @@ export default function App() {
     for (const [id, cell] of Object.entries(cells)) {
       if (cell.status !== 'done') continue
       const base64 = cell.img.split(',')[1]
-      zip.file(`radiator_${id}.png`, base64, { base64: true })
+      zip.file(`radiator_${cell.sections || sections}sekcji_${id}.png`, base64, {
+        base64: true,
+      })
     }
     const blob = await zip.generateAsync({ type: 'blob' })
     const url = URL.createObjectURL(blob)
@@ -354,7 +383,15 @@ export default function App() {
             e.target.files[0] && setPackshot(await fileToDataUrl(e.target.files[0]))
           }
         />
-        {packshot && <img className="preview" src={packshot} alt="Packshot" />}
+        {packshot && (
+          <img
+            className="preview clickable"
+            src={packshot}
+            alt="Packshot"
+            title="Kliknij, aby powiększyć"
+            onClick={() => setLightbox(packshot)}
+          />
+        )}
       </section>
 
       <section className="card">
@@ -379,15 +416,24 @@ export default function App() {
             />
           </label>
         </div>
-        {plate && <img className="preview wide" src={plate} alt="Scene plate" />}
+        {plate && (
+          <img
+            className="preview wide clickable"
+            src={plate}
+            alt="Scene plate"
+            title="Kliknij, aby powiększyć"
+            onClick={() => setLightbox(plate)}
+          />
+        )}
       </section>
 
       <section className="card">
         <h2>Prompty (edytowalne)</h2>
         <p className="hint">
           Dokładnie ten tekst idzie do modelu. W szablonach działają placeholdery:{' '}
-          <code>{'{FINISH}'}</code> jest zastępowany blokiem wybranego finiszu,{' '}
-          <code>{'{VALVE}'}</code> opisem materiału przyłączy. Zmiany zapisują się
+          <code>{'{FINISH}'}</code> blok wybranego finiszu, <code>{'{VALVE}'}</code>{' '}
+          materiał przyłączy, <code>{'{SECTIONS}'}</code> liczba sekcji,{' '}
+          <code>{'{WIDTH_MM}'}</code> szerokość w mm. Zmiany zapisują się
           automatycznie w tej przeglądarce.
         </p>
 
@@ -463,6 +509,23 @@ export default function App() {
       <section className="card">
         <h2>Krok 3: Seria wariantów</h2>
         <div className="pickers">
+          <div>
+            <h3>Liczba sekcji</h3>
+            <select
+              value={sections}
+              onChange={(e) => saveSections(Number(e.target.value))}
+            >
+              {SECTION_VARIANTS.map((v) => (
+                <option key={v.sections} value={v.sections}>
+                  {v.sections} sekcji · {v.width} mm · {v.btu} BTU
+                </option>
+              ))}
+            </select>
+            <p className="hint">
+              Wchodzi do promptu jako {'{SECTIONS}'} i {'{WIDTH_MM}'}. Cała seria
+              jest generowana w jednym wariancie szerokości.
+            </p>
+          </div>
           <div>
             <h3>Finisze</h3>
             {FINISHES.map((f) => (
@@ -549,9 +612,22 @@ export default function App() {
                   )}
                   {cell?.status === 'done' && (
                     <>
-                      <img src={cell.img} alt={id} />
+                      <img
+                        className="clickable"
+                        src={cell.img}
+                        alt={id}
+                        title="Kliknij, aby powiększyć"
+                        onClick={() => setLightbox(cell.img)}
+                      />
                       <div className="row">
-                        <button onClick={() => download(cell.img, `radiator_${id}.png`)}>
+                        <button
+                          onClick={() =>
+                            download(
+                              cell.img,
+                              `radiator_${cell.sections || sections}sekcji_${id}.png`,
+                            )
+                          }
+                        >
                           Pobierz
                         </button>
                         <button onClick={() => retryCell(p.finishKey, v)}>Ponów</button>
@@ -570,6 +646,13 @@ export default function App() {
           )}
         </div>
       </section>
+
+      {lightbox && (
+        <div className="lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Podgląd" />
+          <div className="lightbox-hint">kliknij albo Esc, aby zamknąć</div>
+        </div>
+      )}
 
       <footer>
         <p>
