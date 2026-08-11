@@ -27,8 +27,9 @@ async function fileToDataUrl(file, maxDim = 1600) {
     i.onerror = reject
     i.src = raw
   })
-  if (Math.max(img.width, img.height) <= maxDim) return raw
-  const scale = maxDim / Math.max(img.width, img.height)
+  // Zawsze przekodowuj do JPEG: o wadze decydują bajty, nie wymiary.
+  // Mały wymiarowo PNG potrafi ważyć 3 MB i zrywać połączenie z Gemini.
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(img.width * scale)
   canvas.height = Math.round(img.height * scale)
@@ -37,6 +38,13 @@ async function fileToDataUrl(file, maxDim = 1600) {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
   return canvas.toDataURL('image/jpeg', 0.92)
+}
+
+// Bezpiecznik bajtowy tuż przed wysyłką: cokolwiek powyżej ~900 KB
+// jest dociskane, niezależnie od źródła obrazu.
+async function ensureSmall(dataUrl) {
+  if (!dataUrl || dataUrl.length <= 900_000) return dataUrl
+  return recompress(dataUrl, 1600, 0.85)
 }
 
 // Przekodowuje dataURL (np. ciężki PNG z Gemini) do JPEG i skaluje do maxDim.
@@ -70,7 +78,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v1.3'
+const APP_VERSION = 'v1.4'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
@@ -189,6 +197,10 @@ export default function App() {
     cancelRef.current = false
     setRunning(true)
 
+    // bezpiecznik bajtowy na obu wejściach
+    const packshotSmall = await ensureSmall(packshot)
+    const plateSmall = await ensureSmall(plate)
+
     const init = {}
     for (const p of plan)
       for (const v of p.valveOrder)
@@ -205,7 +217,7 @@ export default function App() {
       const firstPrompt = buildComposePrompt(p.finishKey, firstValve)
       patchCell(firstId, { status: 'running', prompt: firstPrompt })
       try {
-        masterImg = await generateImage(firstPrompt, [packshot, plate])
+        masterImg = await generateImage(firstPrompt, [packshotSmall, plateSmall])
         patchCell(firstId, { status: 'done', img: masterImg })
         // do swapu zaworów kadr idzie jako wejście: przekoduj na lekki JPEG
         masterImg = await recompress(masterImg)
@@ -246,7 +258,10 @@ export default function App() {
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt })
     try {
-      const img = await generateImage(prompt, [packshot, plate])
+      const img = await generateImage(prompt, [
+        await ensureSmall(packshot),
+        await ensureSmall(plate),
+      ])
       patchCell(id, { status: 'done', img })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
