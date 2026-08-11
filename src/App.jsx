@@ -69,6 +69,9 @@ function download(dataUrl, name) {
 
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
+// Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
+const APP_VERSION = 'v1.3'
+
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
 const PROMPTS_LS_KEY = 'radiator-studio-prompts-v1'
@@ -232,7 +235,13 @@ export default function App() {
     setRunning(false)
   }
 
+  // Pojedyncza generacja jednego kadru (zawsze pełna kompozycja packshot+plate).
+  // Używana i przez "Generuj ten kadr", i przez "Ponów".
   const retryCell = async (finishKey, valveKey) => {
+    if (!packshot || !plate) {
+      alert('Potrzebny packshot i wnętrze referencyjne.')
+      return
+    }
     const id = cellId(finishKey, valveKey)
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt })
@@ -264,7 +273,9 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Radiator Studio</h1>
+        <h1>
+          Radiator Studio <span className="version">{APP_VERSION}</span>
+        </h1>
         <p className="sub">
           Jedno wnętrze referencyjne, 6 finiszy, srebrne lub złote przyłącza.
           Silnik: Gemini 2.5 Flash Image.
@@ -463,6 +474,16 @@ export default function App() {
                   <div className="cell-title">
                     {finish.label} · {VALVES[v].label.toLowerCase()}
                   </div>
+                  {!cell?.status && (
+                    <div className="cell-empty">
+                      <button
+                        onClick={() => retryCell(p.finishKey, v)}
+                        disabled={running}
+                      >
+                        Generuj ten kadr
+                      </button>
+                    </div>
+                  )}
                   {cell?.status === 'running' && <div className="spinner" />}
                   {cell?.status === 'error' && (
                     <div className="error">
