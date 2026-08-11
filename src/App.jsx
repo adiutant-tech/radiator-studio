@@ -93,14 +93,14 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v2.3'
+const APP_VERSION = 'v2.4'
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
-// v2: nowe domyślne (ornament na każdej sekcji, rygor dwóch zaworów,
-// placeholdery {SECTIONS}/{WIDTH_MM}). Zmiana klucza celowo porzuca stare
-// edycje z localStorage, żeby wszyscy wystartowali od aktualnych domyślnych.
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v2'
+// Klucz jest wersjonowany: podbicie celowo porzuca edycje z localStorage,
+// żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
+// v3: doświetlenie sceny i ornamentu (v2: ornament wszędzie, dwa zawory).
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v3'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 
 function defaultPrompts() {

@@ -20,7 +20,7 @@ At the edges of the frame: the corner of a linen upholstered sofa at the left, a
 
 The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall, skirting board and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. Two slim copper pipe stubs emerge from the floorboards close to the wall, capped, ready for a radiator to be connected.
 
-Soft overcast London daylight floods in through the window from the left, wrapping the room in gentle directional light with long soft shadows falling to the right. Warm ambient bounce fills the shadows. No hard sun, no flash.
+Soft overcast London daylight floods in through the window from the left, wrapping the room in gentle directional light with long soft shadows falling to the right. The room is bright and airy, generously lit, with warm ambient bounce filling the shadows so no corner falls into heavy darkness. No hard sun, no flash.
 
 Shot on a full-frame camera with a 35 mm lens at f/5.6, camera at the height of the window sill, perfectly level, so all vertical lines stay vertical and there is no wide-angle distortion. Editorial interior photography in the style of World of Interiors: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
 
@@ -102,7 +102,7 @@ Connect the radiator to the two pipes rising from the floorboards using a pair o
 
 Keep the room from image [2] completely unchanged. The wall colour, the window, the curtains, the parquet, the rug, the furniture at the frame edges, the camera position and the lens perspective all stay exactly as they are.
 
-Integrate the radiator into the scene photographically: the same soft overcast daylight from the left rakes across its front, revealing the ornamental relief through gentle directional shadow. Cast a soft shadow to the right along the floor and a tight dark contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the parquet onto the lower edges of the casting. Match the grain, colour temperature and depth of field of image [2] so the result reads as a single photograph.
+Integrate the radiator into the scene photographically. The scene is bright, airy and generously lit: soft daylight from the window at the left combined with a gentle warm fill from the room, so the radiator is clearly and evenly illuminated, with open, luminous shadows rather than heavy darkness. The daylight rakes across the front of the radiator at a low angle and catches every raised detail of the casting, so the ornamental scrollwork on each section reads crisply and sculpturally, never sinking into shadow; there is full visible detail even in the darkest areas of the radiator. Cast a soft shadow to the right along the floor and a tight contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the parquet onto the lower edges of the casting. The exposure is bright and editorial. Match the grain, colour temperature and depth of field of image [2] so the result reads as a single photograph.
 
 The finish of the radiator body: {FINISH}`
 
