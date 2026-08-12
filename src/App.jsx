@@ -134,7 +134,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.6'
+const APP_VERSION = 'v4.8'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -145,7 +145,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v13'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v14'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -243,7 +243,16 @@ export default function App() {
   const [cells, setCells] = useState({})
   const [running, setRunning] = useState(false)
   const [lightbox, setLightbox] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const cancelRef = useRef(false)
+
+  // Esc zamyka okno ustawień
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onKey = (e) => e.key === 'Escape' && setSettingsOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [settingsOpen])
 
   // Esc zamyka podgląd
   useEffect(() => {
@@ -487,17 +496,35 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>
-          Radiator Studio <span className="version">{APP_VERSION}</span>
-        </h1>
-        <p className="sub">
-          One reference interior, six finishes, silver or gold valves.
-        </p>
+      <header className="topbar">
+        <div>
+          <h1>
+            Radiator Studio <span className="version">{APP_VERSION}</span>
+          </h1>
+          <p className="sub">
+            One reference interior, six finishes, silver or gold valves.
+          </p>
+        </div>
+        <button className="settings-btn" onClick={() => setSettingsOpen(true)}>
+          ⚙ Settings
+          {((engine === 'gemini' && !apiKey) ||
+            (engine === 'openai' && !openaiKey)) && (
+            <span className="settings-warn" title="API key missing">
+              !
+            </span>
+          )}
+        </button>
       </header>
 
-      <section className="card">
-        <h2>Settings</h2>
+      {settingsOpen && (
+        <div className="modal" onClick={() => setSettingsOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Settings</h2>
+              <button className="modal-close" onClick={() => setSettingsOpen(false)}>
+                ✕
+              </button>
+            </div>
 
         <div className="row">
           <label className="check">
@@ -583,7 +610,9 @@ export default function App() {
             </p>
           </>
         )}
-      </section>
+          </div>
+        </div>
+      )}
 
       <section className="card">
         <h2>Step 1: Product packshot</h2>
@@ -696,7 +725,7 @@ export default function App() {
                   checked={frameMode === 'product'}
                   onChange={() => saveFrameMode('product')}
                 />
-                Frame: product close-up (~70% under the sill)
+                Frame: product close-up (under-sill fills the frame)
               </label>
               <label className="check">
                 <input
