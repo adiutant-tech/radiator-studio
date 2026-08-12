@@ -12,8 +12,11 @@ import {
   COMPOSE_OWN,
   FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
-  VALVE_REF_COMPOSE,
-  VALVE_REF_SWAP,
+  VALVES_GENERIC,
+  VALVES_REF_SINGLE,
+  VALVES_REF_PAIR,
+  SWAP_REF_SINGLE,
+  SWAP_REF_PAIR,
 } from './prompts.js'
 import {
   generateImage,
@@ -134,7 +137,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.9'
+const APP_VERSION = 'v5.0'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -145,7 +148,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v15'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v16'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -165,8 +168,11 @@ function defaultPrompts() {
     valves: Object.fromEntries(
       Object.values(VALVES).map((v) => [v.key, v.material]),
     ),
-    valveRefCompose: VALVE_REF_COMPOSE,
-    valveRefSwap: VALVE_REF_SWAP,
+    valvesGeneric: VALVES_GENERIC,
+    valvesRefSingle: VALVES_REF_SINGLE,
+    valvesRefPair: VALVES_REF_PAIR,
+    swapRefSingle: SWAP_REF_SINGLE,
+    swapRefPair: SWAP_REF_PAIR,
   }
 }
 
@@ -187,8 +193,11 @@ function loadPrompts() {
       swap: saved.swap ?? d.swap,
       finishes: { ...d.finishes, ...(saved.finishes || {}) },
       valves: { ...d.valves, ...(saved.valves || {}) },
-      valveRefCompose: saved.valveRefCompose ?? d.valveRefCompose,
-      valveRefSwap: saved.valveRefSwap ?? d.valveRefSwap,
+      valvesGeneric: saved.valvesGeneric ?? d.valvesGeneric,
+      valvesRefSingle: saved.valvesRefSingle ?? d.valvesRefSingle,
+      valvesRefPair: saved.valvesRefPair ?? d.valvesRefPair,
+      swapRefSingle: saved.swapRefSingle ?? d.swapRefSingle,
+      swapRefPair: saved.swapRefPair ?? d.swapRefPair,
     }
   } catch {
     return defaultPrompts()
@@ -206,6 +215,8 @@ export default function App() {
   const [openaiProxy, setOpenaiProxyState] = useState(getOpenaiProxy())
   const [packshot, setPackshot] = useState(null)
   const [valveRef, setValveRef] = useState(null)
+  // 'single' = zdjęcie z jednym zaworem, 'pair' = dwa różne (pokrętło + lockshield)
+  const [valveRefMode, setValveRefMode] = useState('single')
   const [plate, setPlate] = useState(null)
   const [plateBusy, setPlateBusy] = useState(false)
 
@@ -299,6 +310,14 @@ export default function App() {
   // Szablon kompozycji zależy od pochodzenia AKTUALNEGO plate'a.
   const buildComposePrompt = (finishKey, valveKey) =>
     (plateOrigin === 'own' ? prompts.composeOwn : prompts.composeStyled)
+      .replaceAll(
+        '{VALVES_BLOCK}',
+        !valveRef
+          ? prompts.valvesGeneric
+          : valveRefMode === 'pair'
+            ? prompts.valvesRefPair
+            : prompts.valvesRefSingle,
+      )
       .replaceAll('{FINISH}', prompts.finishes[finishKey])
       .replaceAll('{VALVE}', prompts.valves[valveKey])
       .replaceAll('{SECTIONS}', String(sectionVariant.sections))
@@ -307,12 +326,18 @@ export default function App() {
         '{FRAMING}',
         plateFrame === 'wide' ? prompts.framingWide : prompts.framingProduct,
       )
-      .replaceAll('{VALVE_REF}', valveRef ? prompts.valveRefCompose : '')
 
   const buildSwapPrompt = (valveKey) =>
     prompts.swap
       .replaceAll('{VALVE}', prompts.valves[valveKey])
-      .replaceAll('{VALVE_REF}', valveRef ? prompts.valveRefSwap : '')
+      .replaceAll(
+        '{VALVE_REF}',
+        !valveRef
+          ? ''
+          : valveRefMode === 'pair'
+            ? prompts.swapRefPair
+            : prompts.swapRefSingle,
+      )
 
   const buildFinishSwapPrompt = (finishKey) =>
     prompts.finishSwap.replaceAll('{FINISH}', prompts.finishes[finishKey])
@@ -668,6 +693,28 @@ export default function App() {
           {valveRef && <button onClick={() => setValveRef(null)}>Remove</button>}
         </div>
         {valveRef && (
+          <div className="row">
+            <label className="check">
+              <input
+                type="radio"
+                name="valveRefMode"
+                checked={valveRefMode === 'single'}
+                onChange={() => setValveRefMode('single')}
+              />
+              Photo shows one valve (used on both sides)
+            </label>
+            <label className="check">
+              <input
+                type="radio"
+                name="valveRefMode"
+                checked={valveRefMode === 'pair'}
+                onChange={() => setValveRefMode('pair')}
+              />
+              Photo shows two different valves (handwheel left, lockshield right)
+            </label>
+          </div>
+        )}
+        {valveRef && (
           <img
             className="preview clickable"
             src={valveRef}
@@ -911,21 +958,45 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Valve reference add-ons ({'{VALVE_REF}'}, used only when a valve photo is uploaded)</summary>
+          <summary>Valve blocks (auto-selected: no photo / one valve / two different valves)</summary>
           <label className="block-label">
-            In composition (valve photo = image [3])
+            No valve photo (generic valves)
             <textarea
-              rows={3}
-              value={prompts.valveRefCompose}
-              onChange={(e) => setPrompt({ valveRefCompose: e.target.value })}
+              rows={4}
+              value={prompts.valvesGeneric}
+              onChange={(e) => setPrompt({ valvesGeneric: e.target.value })}
             />
           </label>
           <label className="block-label">
-            In valve swap (valve photo = image [2])
+            Valve photo: one valve (image [3])
+            <textarea
+              rows={4}
+              value={prompts.valvesRefSingle}
+              onChange={(e) => setPrompt({ valvesRefSingle: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Valve photo: two different valves (image [3])
+            <textarea
+              rows={5}
+              value={prompts.valvesRefPair}
+              onChange={(e) => setPrompt({ valvesRefPair: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Valve swap add-on: one valve (image [2])
             <textarea
               rows={3}
-              value={prompts.valveRefSwap}
-              onChange={(e) => setPrompt({ valveRefSwap: e.target.value })}
+              value={prompts.swapRefSingle}
+              onChange={(e) => setPrompt({ swapRefSingle: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Valve swap add-on: two different valves (image [2])
+            <textarea
+              rows={3}
+              value={prompts.swapRefPair}
+              onChange={(e) => setPrompt({ swapRefPair: e.target.value })}
             />
           </label>
         </details>
