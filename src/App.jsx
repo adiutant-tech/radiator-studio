@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
-  PLATE_SCAFFOLD,
+  PLATE_SCAFFOLD_PRODUCT,
+  PLATE_SCAFFOLD_WIDE,
+  FRAMING,
   STYLES,
   FINISHES,
   VALVES,
@@ -130,7 +132,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.1'
+const APP_VERSION = 'v4.3'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -141,13 +143,17 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v8'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v10'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
+const FRAME_LS_KEY = 'radiator-studio-frame'
 
 function defaultPrompts() {
   return {
-    plateScaffold: PLATE_SCAFFOLD,
+    plateScaffoldProduct: PLATE_SCAFFOLD_PRODUCT,
+    plateScaffoldWide: PLATE_SCAFFOLD_WIDE,
+    framingProduct: FRAMING.product,
+    framingWide: FRAMING.wide,
     styles: Object.fromEntries(STYLES.map((s) => [s.key, s.prompt])),
     composeStyled: COMPOSE_STYLED,
     composeOwn: COMPOSE_OWN,
@@ -164,7 +170,10 @@ function loadPrompts() {
     if (!saved) return defaultPrompts()
     const d = defaultPrompts()
     return {
-      plateScaffold: saved.plateScaffold ?? d.plateScaffold,
+      plateScaffoldProduct: saved.plateScaffoldProduct ?? d.plateScaffoldProduct,
+      plateScaffoldWide: saved.plateScaffoldWide ?? d.plateScaffoldWide,
+      framingProduct: saved.framingProduct ?? d.framingProduct,
+      framingWide: saved.framingWide ?? d.framingWide,
       styles: { ...d.styles, ...(saved.styles || {}) },
       composeStyled: saved.composeStyled ?? d.composeStyled,
       composeOwn: saved.composeOwn ?? d.composeOwn,
@@ -196,6 +205,16 @@ export default function App() {
   // który szablon kompozycji zostanie użyty.
   const [plateMode, setPlateMode] = useState('style')
   const [plateOrigin, setPlateOrigin] = useState('style')
+  // Kadr wybierany przy generowaniu; plateFrame = kadr AKTUALNEGO plate'a,
+  // od niego zależy dopisek {FRAMING} w szablonie kompozycji.
+  const [frameMode, setFrameMode] = useState(
+    () => localStorage.getItem(FRAME_LS_KEY) || 'product',
+  )
+  const [plateFrame, setPlateFrame] = useState('product')
+  const saveFrameMode = (v) => {
+    setFrameMode(v)
+    localStorage.setItem(FRAME_LS_KEY, v)
+  }
   const [styleKey, setStyleKey] = useState(() => {
     const saved = localStorage.getItem(STYLE_LS_KEY)
     return STYLES.some((s) => s.key === saved) ? saved : 'classic-georgian'
@@ -266,6 +285,10 @@ export default function App() {
       .replaceAll('{VALVE}', prompts.valves[valveKey])
       .replaceAll('{SECTIONS}', String(sectionVariant.sections))
       .replaceAll('{WIDTH_MM}', String(sectionVariant.width))
+      .replaceAll(
+        '{FRAMING}',
+        plateFrame === 'wide' ? prompts.framingWide : prompts.framingProduct,
+      )
 
   const buildSwapPrompt = (valveKey) =>
     prompts.swap.replaceAll('{VALVE}', prompts.valves[valveKey])
@@ -307,10 +330,13 @@ export default function App() {
   const generatePlate = async () => {
     setPlateBusy(true)
     try {
-      const stylePrompt = `${prompts.styles[styleKey]}\n\n${prompts.plateScaffold}`
+      const scaffold =
+        frameMode === 'wide' ? prompts.plateScaffoldWide : prompts.plateScaffoldProduct
+      const stylePrompt = `${prompts.styles[styleKey]}\n\n${scaffold}`
       const raw = await generateImage(stylePrompt, [])
       setPlate(await recompress(raw))
       setPlateOrigin('style')
+      setPlateFrame(frameMode)
     } catch (e) {
       alert(`Interior generation failed: ${e.message}`)
     } finally {
@@ -609,6 +635,26 @@ export default function App() {
             </div>
             <p className="hint">{selectedStyle.hint}</p>
             <div className="row">
+              <label className="check">
+                <input
+                  type="radio"
+                  name="frameMode"
+                  checked={frameMode === 'product'}
+                  onChange={() => saveFrameMode('product')}
+                />
+                Frame: product close-up (~70% under the sill)
+              </label>
+              <label className="check">
+                <input
+                  type="radio"
+                  name="frameMode"
+                  checked={frameMode === 'wide'}
+                  onChange={() => saveFrameMode('wide')}
+                />
+                Frame: wide interior
+              </label>
+            </div>
+            <div className="row">
               <button onClick={generatePlate} disabled={plateBusy}>
                 {plateBusy
                   ? 'Generating preview…'
@@ -683,12 +729,41 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Interior scaffold (shared by all styles)</summary>
+          <summary>Interior scaffold: product close-up frame</summary>
           <textarea
             rows={8}
-            value={prompts.plateScaffold}
-            onChange={(e) => setPrompt({ plateScaffold: e.target.value })}
+            value={prompts.plateScaffoldProduct}
+            onChange={(e) => setPrompt({ plateScaffoldProduct: e.target.value })}
           />
+        </details>
+
+        <details>
+          <summary>Interior scaffold: wide frame</summary>
+          <textarea
+            rows={8}
+            value={prompts.plateScaffoldWide}
+            onChange={(e) => setPrompt({ plateScaffoldWide: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Framing add-ons for composition ({'{FRAMING}'})</summary>
+          <label className="block-label">
+            Product close-up
+            <textarea
+              rows={3}
+              value={prompts.framingProduct}
+              onChange={(e) => setPrompt({ framingProduct: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Wide interior
+            <textarea
+              rows={3}
+              value={prompts.framingWide}
+              onChange={(e) => setPrompt({ framingWide: e.target.value })}
+            />
+          </label>
         </details>
 
         <details>

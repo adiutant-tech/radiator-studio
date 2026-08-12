@@ -15,7 +15,15 @@
 
 // --- Wspólny szkielet plate'a (dokleja się do opisu każdego stylu) ----------
 
-export const PLATE_SCAFFOLD = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. The floor along the wall is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
+// Kadr PRODUKTOWY: strefa pod parapetem ~70% ramki, maksimum faktury.
+export const PLATE_SCAFFOLD_PRODUCT = `The composition is a tight, product-focused view of the wall beneath the window. The empty stretch of bare wall and floor under the window sill fills roughly 70 percent of the frame; the sill and the lower part of the window run along the upper edge of the frame, and only a narrow band of the surrounding room shows at the sides. The wall beneath the window is completely empty and unobstructed, and the floor along it is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
+
+Bright, generous natural daylight floods in through the window, filling the space with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. Warm ambient bounce brightens every corner. No hard sun, no flash.
+
+Shot on a full-frame camera with a 50 mm lens at f/8 from about 1.5 metres away, camera slightly below sill height, perfectly level, so all vertical lines stay vertical and there is no wide-angle distortion. Everything is critically sharp across the whole frame, with fine material textures clearly resolved: the grain of the plaster, the paint on the mouldings, the grain of the floor. Editorial product-in-interior photography: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
+
+// Kadr SZEROKI: całe wnętrze, kontekst stylu.
+export const PLATE_SCAFFOLD_WIDE = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. The floor along the wall is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
 
 Bright, generous natural daylight floods in through the window, filling the room with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. Warm ambient bounce brightens every corner. No hard sun, no flash.
 
@@ -165,7 +173,7 @@ export const COMPOSE_STYLED = `Image [1] is a photograph of an interior. Image [
 
 ${PRODUCT_PARA}
 
-Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. It stands beneath the window, and it is rendered at an angle consistent with the camera perspective of image [1], so the two-column depth is readable.
+Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. It stands beneath the window, and it is rendered at an angle consistent with the camera perspective of image [1], so the two-column depth is readable. {FRAMING}
 
 Add two pipes rising vertically out of the floor at the radiator's bottom outer corners, and connect the radiator to them using a pair of traditional angled radiator valves. ${VALVES_PARA}
 
@@ -191,6 +199,13 @@ THE PHOTOGRAPH IS NOT YOURS TO CHANGE. Everything in image [1] apart from the ad
 ${LIGHT_PARA}
 
 The finish of the radiator body: {FINISH}`
+
+// --- Dopiski kadru do szablonu kompozycji ({FRAMING}) ------------------------
+
+export const FRAMING = {
+  product: `The radiator is the hero of the photograph: it fills most of the frame beneath the window, close enough that the cast-iron surface texture, the crispness of the casting and the depth of the ornamental relief are clearly visible on every section.`,
+  wide: `The radiator sits naturally in the scene beneath the window, clearly visible and well lit, its texture and ornament legible, while the room around it remains an important part of the composition.`,
+}
 
 // --- KROK 3a: swap finiszu (z kadru master) ----------------------------------
 
