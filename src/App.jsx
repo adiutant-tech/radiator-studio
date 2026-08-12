@@ -12,6 +12,8 @@ import {
   COMPOSE_OWN,
   FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
+  VALVE_REF_COMPOSE,
+  VALVE_REF_SWAP,
 } from './prompts.js'
 import {
   generateImage,
@@ -132,7 +134,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.5'
+const APP_VERSION = 'v4.6'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -143,7 +145,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v12'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v13'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -161,6 +163,8 @@ function defaultPrompts() {
     swap: VALVE_SWAP_TEMPLATE,
     finishes: Object.fromEntries(FINISHES.map((f) => [f.key, f.block])),
     valves: { silver: VALVES.silver.material, gold: VALVES.gold.material },
+    valveRefCompose: VALVE_REF_COMPOSE,
+    valveRefSwap: VALVE_REF_SWAP,
   }
 }
 
@@ -181,6 +185,8 @@ function loadPrompts() {
       swap: saved.swap ?? d.swap,
       finishes: { ...d.finishes, ...(saved.finishes || {}) },
       valves: { ...d.valves, ...(saved.valves || {}) },
+      valveRefCompose: saved.valveRefCompose ?? d.valveRefCompose,
+      valveRefSwap: saved.valveRefSwap ?? d.valveRefSwap,
     }
   } catch {
     return defaultPrompts()
@@ -197,6 +203,7 @@ export default function App() {
   const [openaiModel, setOpenaiModelState] = useState(getOpenaiModel())
   const [openaiProxy, setOpenaiProxyState] = useState(getOpenaiProxy())
   const [packshot, setPackshot] = useState(null)
+  const [valveRef, setValveRef] = useState(null)
   const [plate, setPlate] = useState(null)
   const [plateBusy, setPlateBusy] = useState(false)
 
@@ -289,9 +296,12 @@ export default function App() {
         '{FRAMING}',
         plateFrame === 'wide' ? prompts.framingWide : prompts.framingProduct,
       )
+      .replaceAll('{VALVE_REF}', valveRef ? prompts.valveRefCompose : '')
 
   const buildSwapPrompt = (valveKey) =>
-    prompts.swap.replaceAll('{VALVE}', prompts.valves[valveKey])
+    prompts.swap
+      .replaceAll('{VALVE}', prompts.valves[valveKey])
+      .replaceAll('{VALVE_REF}', valveRef ? prompts.valveRefSwap : '')
 
   const buildFinishSwapPrompt = (finishKey) =>
     prompts.finishSwap.replaceAll('{FINISH}', prompts.finishes[finishKey])
@@ -363,9 +373,13 @@ export default function App() {
     cancelRef.current = false
     setRunning(true)
 
-    // budżet bajtowy na oba wejścia łącznie
-    // KOLEJNOŚĆ MA ZNACZENIE: obraz [1] = pokój (baza edycji), [2] = packshot
-    const [plateSmall, packshotSmall] = await fitBudget([plate, packshot])
+    // budżet bajtowy na wejścia łącznie
+    // KOLEJNOŚĆ MA ZNACZENIE: [1] = pokój (baza edycji), [2] = packshot,
+    // [3] = opcjonalna referencja zaworu
+    const inputsAll = await fitBudget(
+      valveRef ? [plate, packshot, valveRef] : [plate, packshot],
+    )
+    const [plateSmall, packshotSmall, valveSmall] = inputsAll
 
     const init = {}
     for (const p of plan)
@@ -388,7 +402,11 @@ export default function App() {
       const firstPrompt = isMaster
         ? buildComposePrompt(p.finishKey, firstValve)
         : buildFinishSwapPrompt(p.finishKey)
-      const inputs = isMaster ? [plateSmall, packshotSmall] : [masterFrame]
+      const inputs = isMaster
+        ? valveSmall
+          ? [plateSmall, packshotSmall, valveSmall]
+          : [plateSmall, packshotSmall]
+        : [masterFrame]
 
       patchCell(firstId, { status: 'running', prompt: firstPrompt, sections })
       try {
@@ -413,7 +431,10 @@ export default function App() {
         const swapPrompt = buildSwapPrompt(secondValve)
         patchCell(secondId, { status: 'running', prompt: swapPrompt, sections })
         try {
-          const img = await generateImage(swapPrompt, [frameImg])
+          const img = await generateImage(
+            swapPrompt,
+            valveSmall ? [frameImg, valveSmall] : [frameImg],
+          )
           patchCell(secondId, { status: 'done', img })
         } catch (e) {
           patchCell(secondId, { status: 'error', error: e.message })
@@ -434,8 +455,11 @@ export default function App() {
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt, sections })
     try {
-      // [1] = pokój (baza edycji), [2] = packshot
-      const img = await generateImage(prompt, await fitBudget([plate, packshot]))
+      // [1] = pokój (baza edycji), [2] = packshot, [3] = opcjonalny zawór
+      const img = await generateImage(
+        prompt,
+        await fitBudget(valveRef ? [plate, packshot, valveRef] : [plate, packshot]),
+      )
       patchCell(id, { status: 'done', img })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
@@ -580,6 +604,36 @@ export default function App() {
             alt="Packshot"
             title="Click to enlarge"
             onClick={() => setLightbox(packshot)}
+          />
+        )}
+
+        <h3 style={{ marginTop: 16 }}>Valve packshot (optional)</h3>
+        <p className="hint">
+          If provided, it becomes the exact design reference for both valves;
+          only the metal finish (silver/gold) is changed per variant. Without
+          it, the model invents a generic traditional valve.
+        </p>
+        <div className="row">
+          <label className="upload-btn">
+            Upload valve photo
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={async (e) =>
+                e.target.files[0] && setValveRef(await fileToDataUrl(e.target.files[0]))
+              }
+            />
+          </label>
+          {valveRef && <button onClick={() => setValveRef(null)}>Remove</button>}
+        </div>
+        {valveRef && (
+          <img
+            className="preview clickable"
+            src={valveRef}
+            alt="Valve reference"
+            title="Click to enlarge"
+            onClick={() => setLightbox(valveRef)}
           />
         )}
       </section>
@@ -814,6 +868,26 @@ export default function App() {
               />
             </label>
           ))}
+        </details>
+
+        <details>
+          <summary>Valve reference add-ons ({'{VALVE_REF}'}, used only when a valve photo is uploaded)</summary>
+          <label className="block-label">
+            In composition (valve photo = image [3])
+            <textarea
+              rows={3}
+              value={prompts.valveRefCompose}
+              onChange={(e) => setPrompt({ valveRefCompose: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            In valve swap (valve photo = image [2])
+            <textarea
+              rows={3}
+              value={prompts.valveRefSwap}
+              onChange={(e) => setPrompt({ valveRefSwap: e.target.value })}
+            />
+          </label>
         </details>
 
         <details>
