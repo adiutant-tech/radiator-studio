@@ -95,7 +95,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v3.4'
+const APP_VERSION = 'v3.5'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -104,9 +104,9 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 
 // Klucz jest wersjonowany: podbicie celowo porzuca edycje z localStorage,
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
-// v6: kompozycja jako EDYCJA pokoju (pokój = obraz [1], packshot = [2]),
-// framing "edit this photograph" zamiast "compose a scene".
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v6'
+// v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
+// knee height" z czasów Short Ascota; wysokość produktu z referencji).
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v7'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 

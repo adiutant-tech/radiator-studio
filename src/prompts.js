@@ -151,25 +151,25 @@ export const SECTION_VARIANTS = [
 
 // --- Wspólne fragmenty szablonów kompozycji ----------------------------------
 
-const PRODUCT_PARA = `Reproduce the radiator design from image [1] one to one: the silhouette, the proportions of a single section, the raised ornamental scrollwork cast into every single section, the shape of the four curved decorative feet, and the round valve bosses at the bottom outer corners. Do not redesign, simplify, stylise or omit the ornament on any section; every section carries the same raised relief pattern as in image [1]. Build the radiator with exactly {SECTIONS} sections: repeat the identical section design so the radiator has {SECTIONS} evenly spaced sections and is approximately {WIDTH_MM} mm wide. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.`
+const PRODUCT_PARA = `Image [2] is the single source of truth for the radiator's design AND its proportions. Copy it one to one: the silhouette, the real height-to-width proportions of a single section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the raised ornamental scrollwork cast into every single section, the shape of the decorative feet, and the round valve bosses at the bottom outer corners. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it, and do not omit the ornament on any section; every section carries the same raised relief pattern as in image [2]. The ONLY permitted deviation from image [2] is the number of sections: build the radiator with exactly {SECTIONS} evenly spaced identical sections, approximately {WIDTH_MM} mm wide in total, while each individual section stays exactly as in image [2]. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.`
 
 const VALVES_PARA = `There are exactly two valves, one at each bottom outer corner of the radiator, never one and never more than two. Each valve stands on its own pipe coming vertically out of the floor and joins the radiator at the bottom of its end section, the left valve at the left end, the right valve at the right end. Both valves are identical in style and size, and both are fully connected, nothing floats loose in the room. Both valves and their visible pipework are made of {VALVE}. The valve metal contrasts cleanly with the radiator body.`
 
-const LIGHT_PARA = `Integrate the radiator into the scene photographically. Follow the direction and character of the daylight already present in image [2], and keep the scene bright, airy and generously lit, with open, luminous shadows rather than heavy darkness. The light rakes across the front of the radiator at a low angle and catches every raised detail of the casting, so the ornamental scrollwork on each section reads crisply and sculpturally, never sinking into shadow; there is full visible detail even in the darkest areas of the radiator. Cast a soft shadow along the floor consistent with the room's light, and a tight contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the floor onto the lower edges of the casting. The exposure is bright and editorial. Match the grain, colour temperature and depth of field of image [2] so the result reads as a single photograph.`
+const LIGHT_PARA = `Integrate the radiator into the photograph seamlessly. Follow the direction and character of the daylight already present in image [1], and keep the scene bright, airy and generously lit, with open, luminous shadows rather than heavy darkness. The light rakes across the front of the radiator at a low angle and catches every raised detail of the casting, so the ornamental scrollwork on each section reads crisply and sculpturally, never sinking into shadow; there is full visible detail even in the darkest areas of the radiator. Cast a soft shadow along the floor consistent with the room's light, and a tight contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the floor onto the lower edges of the casting. Match the grain, colour temperature and depth of field of image [1] so the radiator reads as if it had been in the original photograph all along.`
 
 // --- KROK 2a: kompozycja dla WNĘTRZA GENEROWANEGO (plate ze stylu) ----------
 // Plate ze szkieletu zawsze ma okno, pustą ścianę i rurki, więc szablon może
 // się do nich odwoływać wprost.
 
-export const COMPOSE_STYLED = `Using image [1] as the exact product reference and image [2] as the room, place the cast iron radiator from image [1] into the room from image [2], standing on the floor against the wall directly beneath the window.
+export const COMPOSE_STYLED = `Image [1] is a photograph of an interior. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph, standing on the floor against the wall directly beneath the window. This is an edit of image [1], not a new scene.
 
 ${PRODUCT_PARA}
 
-It is a low radiator, about knee height. The top of the radiator sits well below the window sill with a clear gap between them. Show it from a gentle three-quarter angle, so the two-column depth is readable.
+Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. It stands beneath the window, and it is rendered at an angle consistent with the camera perspective of image [1], so the two-column depth is readable.
 
 Connect the radiator to the two pipes rising from the floor using a pair of traditional angled radiator valves. ${VALVES_PARA}
 
-Keep the room from image [2] completely unchanged: the walls, the window, the floor, every piece of furniture and every object, the camera position and the lens perspective all stay exactly as in image [2]. The only change to the scene is the radiator with its two valves added beneath the window.
+Everything else in image [1] stays exactly as it is: the walls, the window, the floor, every piece of furniture and every object, the framing, the camera position and the lens perspective. The result must be instantly recognisable as the same photograph with one addition: the radiator and its two valves.
 
 ${LIGHT_PARA}
 
@@ -178,15 +178,15 @@ The finish of the radiator body: {FINISH}`
 // --- KROK 2b: kompozycja dla WŁASNEGO ZDJĘCIA (wnętrze dowolne) --------------
 // Zero założeń o pokoju: bez okna, bez parkietu, bez kierunku światła.
 
-export const COMPOSE_OWN = `Using image [1] as the exact product reference and image [2] as the room, place the cast iron radiator from image [1] into the room from image [2]. It stands on the floor against a clear stretch of wall: beneath the window if the room in image [2] has one, otherwise in the most natural empty spot for a radiator.
+export const COMPOSE_OWN = `Image [1] is a photograph of a real room. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph. It stands on the floor against a clear stretch of wall visible in image [1]: beneath the window if there is one, otherwise in the most natural empty spot for a radiator. This is an edit of the photograph, not a new scene.
 
 ${PRODUCT_PARA}
 
-It is a low radiator, about knee height. If there is a window above it, the top of the radiator sits well below the sill with a clear gap. Show it from a gentle three-quarter angle, so the two-column depth is readable.
+Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. It stands at an angle consistent with the camera perspective of image [1].
 
-Connect the radiator to two pipes rising vertically out of the floor; if no pipes are visible in image [2], add them discreetly at the radiator's bottom outer corners. ${VALVES_PARA}
+Connect the radiator to two pipes rising vertically out of the floor; if no pipes are visible in image [1], add them discreetly at the radiator's bottom outer corners. ${VALVES_PARA}
 
-THE ROOM IS NOT YOURS TO CHANGE. Keep the room from image [2] completely unchanged and instantly recognisable as the same place: the same walls, the same windows, the same floor, every piece of furniture and every object, the same camera position and the same lens perspective as in image [2]. Do not replace the room, do not restyle it, do not invent a different interior. The only change to the scene is the radiator with its two valves added against the wall.
+THE PHOTOGRAPH IS NOT YOURS TO CHANGE. Everything in image [1] apart from the added radiator stays pixel-faithful and instantly recognisable as the same place: the same walls, the same windows, the same floor, every piece of furniture and every object, the same framing, the same camera position and the same lens perspective. Do not replace the room, do not restyle it, do not tidy it, do not invent a different interior. The only change is the radiator with its two valves added against the wall.
 
 ${LIGHT_PARA}
 
