@@ -130,7 +130,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.0'
+const APP_VERSION = 'v4.1'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -141,7 +141,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v7'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v8'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 
@@ -248,7 +248,7 @@ export default function App() {
   }
 
   const resetPrompts = () => {
-    if (confirm('Przywrócić wszystkie prompty do wartości domyślnych?')) {
+    if (confirm('Restore all prompts to their default values?')) {
       setPrompts(defaultPrompts())
     }
   }
@@ -312,7 +312,7 @@ export default function App() {
       setPlate(await recompress(raw))
       setPlateOrigin('style')
     } catch (e) {
-      alert(`Błąd generacji wnętrza: ${e.message}`)
+      alert(`Interior generation failed: ${e.message}`)
     } finally {
       setPlateBusy(false)
     }
@@ -331,7 +331,7 @@ export default function App() {
 
   const runSeries = async () => {
     if (!packshot || !plate) {
-      alert('Potrzebny packshot i wnętrze referencyjne.')
+      alert('A packshot and a reference interior are required.')
       return
     }
     cancelRef.current = false
@@ -376,7 +376,7 @@ export default function App() {
         if (secondValve)
           patchCell(cellId(p.finishKey, secondValve), {
             status: 'error',
-            error: 'Pominięto: brak kadru bazowego dla tego finiszu.',
+            error: 'Skipped: no base frame for this finish.',
           })
         continue
       }
@@ -398,10 +398,10 @@ export default function App() {
   }
 
   // Pojedyncza generacja jednego kadru (zawsze pełna kompozycja packshot+plate).
-  // Używana i przez "Generuj ten kadr", i przez "Ponów".
+  // Używana i przez "Generate this frame", i przez "Ponów".
   const retryCell = async (finishKey, valveKey) => {
     if (!packshot || !plate) {
-      alert('Potrzebny packshot i wnętrze referencyjne.')
+      alert('A packshot and a reference interior are required.')
       return
     }
     const id = cellId(finishKey, valveKey)
@@ -421,7 +421,7 @@ export default function App() {
     for (const [id, cell] of Object.entries(cells)) {
       if (cell.status !== 'done') continue
       const jpeg = await toJpeg(cell.img)
-      zip.file(`radiator_${cell.sections || sections}sekcji_${id}.jpg`, jpeg.split(',')[1], {
+      zip.file(`radiator_${cell.sections || sections}sections_${id}.jpg`, jpeg.split(',')[1], {
         base64: true,
       })
     }
@@ -442,13 +442,12 @@ export default function App() {
           Radiator Studio <span className="version">{APP_VERSION}</span>
         </h1>
         <p className="sub">
-          Jedno wnętrze referencyjne, 6 finiszy, srebrne lub złote przyłącza.
-          Silnik: Gemini 2.5 Flash Image.
+          One reference interior, six finishes, silver or gold valves.
         </p>
       </header>
 
       <section className="card">
-        <h2>Ustawienia</h2>
+        <h2>Settings</h2>
 
         <div className="row">
           <label className="check">
@@ -458,7 +457,7 @@ export default function App() {
               checked={engine === 'gemini'}
               onChange={() => saveEngine('gemini')}
             />
-            Gemini (Nano Banana), rekomendowany
+            Gemini (Nano Banana), recommended
           </label>
           <label className="check">
             <input
@@ -467,20 +466,17 @@ export default function App() {
               checked={engine === 'openai'}
               onChange={() => saveEngine('openai')}
             />
-            OpenAI (GPT Image), eksperymentalny
+            OpenAI (GPT Image), experimental
           </label>
         </div>
         <p className="hint">
-          Gemini najlepiej trzyma formę odlewu i pokój (edycja z zachowaniem
-          tożsamości). OpenAI przerysowuje scenę, nawet z input_fidelity=high
-          spodziewaj się dryfu detalu; używaj do moodów i porównań, nie do
-          serii z gwarancją formy. Klucze zostają w tej przeglądarce.
+          Gemini preserves the casting and the room best (identity-preserving editing). OpenAI re-renders the scene; even with input_fidelity=high expect detail drift. Use it for moods and comparisons, not for form-guaranteed series. Keys stay in this browser only.
         </p>
 
         {engine === 'gemini' && (
           <>
             <label>
-              Klucz API Gemini (Google AI Studio)
+              Gemini API key (Google AI Studio)
               <input
                 type="password"
                 placeholder="AIza..."
@@ -489,7 +485,7 @@ export default function App() {
               />
             </label>
             <label>
-              Model obrazkowy
+              Image model
               <input
                 type="text"
                 placeholder={DEFAULT_MODEL}
@@ -498,8 +494,7 @@ export default function App() {
               />
             </label>
             <p className="hint">
-              Domyślny {DEFAULT_MODEL} generuje ~1 MP. Jeśli macie dostęp do
-              wariantu Pro (2K/4K), wpisz tu jego identyfikator.
+              The default {DEFAULT_MODEL} outputs ~1 MP. If you have access to a Pro variant (2K/4K), enter its model ID here.
             </p>
           </>
         )}
@@ -507,7 +502,7 @@ export default function App() {
         {engine === 'openai' && (
           <>
             <label>
-              Klucz API OpenAI
+              OpenAI API key
               <input
                 type="password"
                 placeholder="sk-..."
@@ -516,7 +511,7 @@ export default function App() {
               />
             </label>
             <label>
-              Model obrazkowy
+              Image model
               <input
                 type="text"
                 placeholder={DEFAULT_OPENAI_MODEL}
@@ -525,7 +520,7 @@ export default function App() {
               />
             </label>
             <label>
-              Proxy OpenAI (adres Cloudflare Workera)
+              OpenAI proxy (Cloudflare Worker URL)
               <input
                 type="url"
                 placeholder="https://radiator-openai.twoj-worker.workers.dev"
@@ -534,21 +529,16 @@ export default function App() {
               />
             </label>
             <p className="hint">
-              api.openai.com nie pozwala na wywołania z przeglądarki (brak
-              CORS), więc proxy jest w praktyce wymagane: wdróż worker/
-              worker-openai.js (instrukcja w README) i wklej tu jego adres.
-              Klucz nadal zostaje w przeglądarce, proxy tylko przekazuje ruch.
+              api.openai.com does not allow browser calls (no CORS), so a proxy is effectively required: deploy worker/worker-openai.js (see README) and paste its URL here. The key still stays in the browser; the proxy only relays traffic.
             </p>
           </>
         )}
       </section>
 
       <section className="card">
-        <h2>Krok 1: Packshot produktu</h2>
+        <h2>Step 1: Product packshot</h2>
         <p className="hint">
-          Zdjęcie produktowe ze sklepu, najlepiej wycięte na białym tle. To jest
-          źródło geometrii odlewu, model ma zakaz jej zmieniania. Obraz jest
-          automatycznie skalowany do 1600 px przed wysyłką.
+          A product photo from the shop, ideally cut out on white. This is the source of truth for the casting geometry; the model is forbidden to change it. The image is automatically scaled to 1600 px before sending.
         </p>
         <input
           type="file"
@@ -562,18 +552,16 @@ export default function App() {
             className="preview clickable"
             src={packshot}
             alt="Packshot"
-            title="Kliknij, aby powiększyć"
+            title="Click to enlarge"
             onClick={() => setLightbox(packshot)}
           />
         )}
       </section>
 
       <section className="card">
-        <h2>Krok 2: Wnętrze referencyjne (scene plate)</h2>
+        <h2>Step 2: Reference interior (scene plate)</h2>
         <p className="hint">
-          Jedno wnętrze na całą serię. Dwa tory: wygeneruj pokój w wybranym
-          stylu angielskim albo wgraj własne zdjęcie, każdy tor używa innego
-          szablonu kompozycji.
+          One interior for the whole series. Two paths: generate a room in a chosen English style, or upload your own photo; each path uses a different composition template.
         </p>
 
         <div className="row">
@@ -584,7 +572,7 @@ export default function App() {
               checked={plateMode === 'style'}
               onChange={() => setPlateMode('style')}
             />
-            Generuj w stylu z listy
+            Generate in a style from the list
           </label>
           <label className="check">
             <input
@@ -593,7 +581,7 @@ export default function App() {
               checked={plateMode === 'own'}
               onChange={() => setPlateMode('own')}
             />
-            Własne zdjęcie wnętrza
+            Own interior photo
           </label>
         </div>
 
@@ -623,8 +611,8 @@ export default function App() {
             <div className="row">
               <button onClick={generatePlate} disabled={plateBusy}>
                 {plateBusy
-                  ? 'Generuję podgląd…'
-                  : `Generuj wnętrze: ${selectedStyle.label}`}
+                  ? 'Generating preview…'
+                  : `Generate interior: ${selectedStyle.label}`}
               </button>
             </div>
           </>
@@ -633,7 +621,7 @@ export default function App() {
         {plateMode === 'own' && (
           <div className="row">
             <label className="upload-btn">
-              Wgraj zdjęcie wnętrza
+              Upload interior photo
               <input
                 type="file"
                 accept="image/*"
@@ -653,30 +641,24 @@ export default function App() {
               className="preview wide clickable"
               src={plate}
               alt="Scene plate"
-              title="Kliknij, aby powiększyć"
+              title="Click to enlarge"
               onClick={() => setLightbox(plate)}
             />
             <p className="hint">
-              Miniatura powyżej to wnętrze, które zostanie użyte w serii
-              (źródło: {plateOrigin === 'own' ? 'własne zdjęcie' : 'styl z listy'}).
-              Nie podoba się? Generuj ponownie albo wgraj inne, zanim odpalisz serię.
+              The image above is the interior that will be used for the whole series (source: {plateOrigin === 'own' ? 'own photo' : 'style from the list'}). Not happy with it? Regenerate or upload another one before you run the series.
             </p>
           </>
         )}
       </section>
 
       <section className="card">
-        <h2>Prompty (edytowalne)</h2>
+        <h2>Prompts (editable)</h2>
         <p className="hint">
-          Dokładnie ten tekst idzie do modelu. W szablonach działają placeholdery:{' '}
-          <code>{'{FINISH}'}</code> blok wybranego finiszu, <code>{'{VALVE}'}</code>{' '}
-          materiał przyłączy, <code>{'{SECTIONS}'}</code> liczba sekcji,{' '}
-          <code>{'{WIDTH_MM}'}</code> szerokość w mm. Zmiany zapisują się
-          automatycznie w tej przeglądarce.
+          This exact text is sent to the model. Placeholders work inside templates:{' '}<code>{'{FINISH}'}</code> the selected finish block, <code>{'{VALVE}'}</code>{' '}the valve material, <code>{'{SECTIONS}'}</code> the section count,{' '}<code>{'{WIDTH_MM}'}</code> the width in mm. Changes save automatically in this browser.
         </p>
 
         <details>
-          <summary>Style wnętrz ({STYLES.length}, każdy edytowalny osobno)</summary>
+          <summary>Interior styles ({STYLES.length}, each editable separately)</summary>
           {STYLES.map((s) => (
             <label key={s.key} className="block-label">
               <span className="style-editor-head">
@@ -701,7 +683,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Szkielet wnętrza (wspólny dla wszystkich stylów)</summary>
+          <summary>Interior scaffold (shared by all styles)</summary>
           <textarea
             rows={8}
             value={prompts.plateScaffold}
@@ -710,7 +692,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Szablon kompozycji: wnętrze generowane ze stylu</summary>
+          <summary>Composition template: interior generated from a style</summary>
           <textarea
             rows={16}
             value={prompts.composeStyled}
@@ -719,7 +701,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Szablon kompozycji: własne zdjęcie wnętrza</summary>
+          <summary>Composition template: own interior photo</summary>
           <textarea
             rows={16}
             value={prompts.composeOwn}
@@ -728,7 +710,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Szablon swapu finiszu (seria z jednego kadru)</summary>
+          <summary>Finish swap template (series from one frame)</summary>
           <textarea
             rows={5}
             value={prompts.finishSwap}
@@ -737,7 +719,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Szablon swapu przyłączy</summary>
+          <summary>Valve swap template</summary>
           <textarea
             rows={5}
             value={prompts.swap}
@@ -746,7 +728,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Bloki finiszy (6)</summary>
+          <summary>Finish blocks (6)</summary>
           {FINISHES.map((f) => (
             <label key={f.key} className="block-label">
               {f.label}
@@ -760,7 +742,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Materiały przyłączy (2)</summary>
+          <summary>Valve materials (2)</summary>
           {Object.values(VALVES).map((v) => (
             <label key={v.key} className="block-label">
               {v.label}
@@ -774,32 +756,31 @@ export default function App() {
         </details>
 
         <div className="row">
-          <button onClick={resetPrompts}>Przywróć domyślne</button>
+          <button onClick={resetPrompts}>Restore defaults</button>
         </div>
       </section>
 
       <section className="card">
-        <h2>Krok 3: Seria wariantów</h2>
+        <h2>Step 3: Variant series</h2>
         <div className="pickers">
           <div>
-            <h3>Liczba sekcji</h3>
+            <h3>Sections</h3>
             <select
               value={sections}
               onChange={(e) => saveSections(Number(e.target.value))}
             >
               {SECTION_VARIANTS.map((v) => (
                 <option key={v.sections} value={v.sections}>
-                  {v.sections} sekcji · {v.width} mm · {v.btu} BTU
+                  {v.sections} sections · {v.width} mm · {v.btu} BTU
                 </option>
               ))}
             </select>
             <p className="hint">
-              Wchodzi do promptu jako {'{SECTIONS}'} i {'{WIDTH_MM}'}. Cała seria
-              jest generowana w jednym wariancie szerokości.
+              Enters the prompt as {'{SECTIONS}'} and {'{WIDTH_MM}'}. The whole series is generated in a single width variant.
             </p>
           </div>
           <div>
-            <h3>Finisze</h3>
+            <h3>Finishes</h3>
             {FINISHES.map((f) => (
               <label key={f.key} className="check">
                 <input
@@ -816,7 +797,7 @@ export default function App() {
             ))}
           </div>
           <div>
-            <h3>Przyłącza</h3>
+            <h3>Valves</h3>
             {Object.values(VALVES).map((v) => (
               <label key={v.key} className="check">
                 <input
@@ -841,14 +822,14 @@ export default function App() {
             disabled={running || !packshot || !plate || totalCells === 0}
           >
             {running
-              ? `Generuję… (${doneCount}/${totalCells})`
-              : `Generuj serię (${totalCells} obrazów)`}
+              ? `Generating… (${doneCount}/${totalCells})`
+              : `Generate series (${totalCells} images)`}
           </button>
           {running && (
-            <button onClick={() => (cancelRef.current = true)}>Przerwij</button>
+            <button onClick={() => (cancelRef.current = true)}>Stop</button>
           )}
           {doneCount > 0 && !running && (
-            <button onClick={downloadAll}>Pobierz wszystko (ZIP)</button>
+            <button onClick={downloadAll}>Download all (ZIP)</button>
           )}
         </div>
 
@@ -869,7 +850,7 @@ export default function App() {
                         onClick={() => retryCell(p.finishKey, v)}
                         disabled={running}
                       >
-                        Generuj ten kadr
+                        Generate this frame
                       </button>
                     </div>
                   )}
@@ -878,7 +859,7 @@ export default function App() {
                     <div className="error">
                       <p>{cell.error}</p>
                       <button onClick={() => retryCell(p.finishKey, v)}>
-                        Ponów (pełna kompozycja)
+                        Retry (full composition)
                       </button>
                     </div>
                   )}
@@ -888,7 +869,7 @@ export default function App() {
                         className="clickable"
                         src={cell.img}
                         alt={id}
-                        title="Kliknij, aby powiększyć"
+                        title="Click to enlarge"
                         onClick={() => setLightbox(cell.img)}
                       />
                       <div className="row">
@@ -896,19 +877,19 @@ export default function App() {
                           onClick={async () =>
                             download(
                               await toJpeg(cell.img),
-                              `radiator_${cell.sections || sections}sekcji_${id}.jpg`,
+                              `radiator_${cell.sections || sections}sections_${id}.jpg`,
                             )
                           }
                         >
-                          Pobierz
+                          Download
                         </button>
-                        <button onClick={() => retryCell(p.finishKey, v)}>Ponów</button>
+                        <button onClick={() => retryCell(p.finishKey, v)}>Retry</button>
                       </div>
                     </>
                   )}
                   {cell?.prompt && (
                     <details className="prompt-details">
-                      <summary>Prompt użyty w tym kadrze</summary>
+                      <summary>Prompt used for this frame</summary>
                       <pre className="prompt-pre">{cell.prompt}</pre>
                     </details>
                   )}
@@ -921,16 +902,14 @@ export default function App() {
 
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="Podgląd" />
-          <div className="lightbox-hint">kliknij albo Esc, aby zamknąć</div>
+          <img src={lightbox} alt="Preview" />
+          <div className="lightbox-hint">click or press Esc to close</div>
         </div>
       )}
 
       <footer>
         <p>
-          QA przed wysyłką do klienta: policz sekcje na packshocie i na kadrze,
-          sprawdź 2 kolumny w głąb, wysokość poniżej parapetu, ornament tylko na
-          skrajnych sekcjach, cień zgodny ze światłem z okna.
+          QA before sending to the client: count the sections against the packshot, check the two-column depth, the ornament on every section, both valves connected, and the shadow direction consistent with the window light.
         </p>
       </footer>
     </div>

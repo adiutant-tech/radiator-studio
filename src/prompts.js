@@ -15,7 +15,7 @@
 
 // --- Wspólny szkielet plate'a (dokleja się do opisu każdego stylu) ----------
 
-export const PLATE_SCAFFOLD = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. Two slim capped pipe stubs emerge from the floor close to the wall, ready for a radiator to be connected.
+export const PLATE_SCAFFOLD = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. The floor along the wall is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
 
 Bright, generous natural daylight floods in through the window, filling the room with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. Warm ambient bounce brightens every corner. No hard sun, no flash.
 
@@ -27,61 +27,61 @@ export const STYLES = [
   {
     key: 'classic-georgian',
     label: 'Classic Georgian',
-    hint: 'Symetria, głębokie listwy przypodłogowe, wyważone sztukaterie, powściągliwa paleta, idealne proporcje.',
+    hint: 'Symmetry, deep skirting, refined mouldings, restrained palette, perfect proportions.',
     prompt: `A photorealistic interior photograph of a room in a classic Georgian townhouse. Perfect classical proportions and symmetry: a tall sash window with slim glazing bars centred on the wall, refined restrained mouldings, panelled wall below dado height, a deep moulded skirting board, walls and joinery in a restrained chalky heritage palette of soft greys and putty tones, herringbone oak parquet, a soft linen curtain at the frame's edge. Calm, balanced and quietly grand.`,
   },
   {
     key: 'contemporary-georgian',
     label: 'Contemporary Georgian',
-    hint: 'Czyste wykończenia, uproszczone sztukaterie, jaśniejsza paleta, nowoczesna elegancja w klasycznej architekturze.',
+    hint: 'Crisp, clean finishes, simplified mouldings, lighter palette, modern refinement within classic architecture.',
     prompt: `A photorealistic interior photograph of a room in a contemporary Georgian style. Classic Georgian architecture with crisp, clean finishes: a tall sash window, simplified mouldings and panelling, walls in a light warm off-white palette, smooth painted joinery, pale herringbone timber floor, an airy sheer linen curtain. Modern refinement within classical bones, bright, precise and uncluttered.`,
   },
   {
     key: 'georgian-heritage',
     label: 'Georgian Heritage',
-    hint: 'Tradycyjny detal, panelowane glify, grubsze opaski okienne, historyczny charakter i głębia.',
+    hint: 'Traditional detailing, panelled reveals, thicker architraves, historic character and depth.',
     prompt: `A photorealistic interior photograph of a room in a Georgian heritage style. Traditional period detailing with real depth: a tall sash window set in a deep panelled reveal, thick architraves, a panelled door with brass hardware at the frame's edge, full-height wall panelling in a muted sage-green heritage colour, aged herringbone parquet. Historic character, layered joinery and a strong sense of age and craftsmanship.`,
   },
   {
     key: 'victorian-townhouse',
     label: 'Victorian Townhouse',
-    hint: 'Ozdobne gzymsy, głębokie kolory, dekoracyjne listwy, bardziej opulentny i dramatyczny detal.',
+    hint: 'Ornate cornices, rich colours, decorative trim, more opulent and dramatic detailing.',
     prompt: `A photorealistic interior photograph of a room in a Victorian townhouse. Opulent and dramatic period detailing: a tall sash window with brass fittings, ornate cornices, decorative trim, walls and panelling in a deep rich colour such as dark green, a subtly patterned wallpaper above the panelling, heavy patterned curtains with tasselled tiebacks, a dark wood side table, a gilt-framed painting, herringbone parquet. Rich, moody and atmospheric, yet elegant.`,
   },
   {
     key: 'edwardian',
     label: 'Edwardian',
-    hint: 'Miększy niż wiktoriański: eleganckie sztukaterie, jaśniejsze kolory, lekkość i wdzięk.',
+    hint: 'Softer than Victorian: elegant mouldings, lighter colours, gracious and airy feel.',
     prompt: `A photorealistic interior photograph of a room in an Edwardian style, softer than Victorian. A generous sash window letting in plenty of daylight, elegant but lighter mouldings, panelled wall in a soft warm neutral, gentle curtains, light timber floor. Gracious and airy, a period room with charm and lightness, naturally suited to contemporary life.`,
   },
   {
     key: 'english-country',
     label: 'English Country',
-    hint: 'Swobodna, rustykalna elegancja, naturalne materiały, patyna, miękkie tkaniny i faktury.',
+    hint: 'Relaxed, rustic elegance, natural materials, aged finishes, soft fabrics and textures.',
     prompt: `A photorealistic interior photograph of a room in a relaxed English country style. Rustic elegance and natural materials: a sash window with a deep sill, softly aged lime-washed or patinated plaster walls with visible texture, faded floral curtains, a small gilt-framed painting, warm timber floor with a woven natural-fibre rug. Everything gently worn and soft, aged finishes, lived-in warmth and quiet charm.`,
   },
   {
     key: 'modern-english-country',
     label: 'Modern English Country',
-    hint: 'Spokojne kolory, naturalne tekstury, klasyczna architektura w swobodnym, współczesnym wydaniu.',
+    hint: 'Calm colours, natural textures, classic architecture with a relaxed, contemporary country feel.',
     prompt: `A photorealistic interior photograph of a room in a modern English country style. Classic architecture with a relaxed contemporary country feel: a sash window with a vase of garden flowers on the sill, calm putty and off-white colours, simple linen curtains, framed prints on the wall, a rustic antique chair, natural textures, a woven jute rug on a pale timber floor. Fresh, calm, warm and unpretentious.`,
   },
   {
     key: 'arts-and-crafts',
     label: 'Arts & Crafts',
-    hint: 'Rzemiosło, bogate drewno, fakturowane powierzchnie, ziemiste kolory, detale rękodzielnicze.',
+    hint: 'Craftsmanship, rich woods, textured surfaces, earthy colours, artisan details.',
     prompt: `A photorealistic interior photograph of a room in the English Arts and Crafts spirit. Craftsmanship and rich woods: a sash window with a small stained-glass panel detail, handsome oak joinery and warm timber panelling, walls in an earthy sage green, an antique handcrafted chair, a patterned rug with earthy reds on aged parquet, textured artisan surfaces throughout. Honest materials, warm earthy colours and visible hand-made quality.`,
   },
   {
     key: 'british-new-traditional',
     label: 'British New Traditional',
-    hint: 'Powściągliwie i ponadczasowo: neutralna paleta, klasyczny szkielet architektury, minimum dekoracji.',
+    hint: 'Understated, timeless: neutral palette, classic architectural bones, minimal decoration.',
     prompt: `A photorealistic interior photograph of a room in a British new traditional style. Understated and timeless: classic architectural bones, a tall sash window, refined panelling and cornicing, but a strictly neutral palette of soft whites and pale greys, minimal decoration, one simple linen curtain, clean uncluttered surfaces. Quiet, precise, "London interior designer" restraint within period architecture.`,
   },
   {
     key: 'london-eclectic',
     label: 'London Eclectic Heritage',
-    hint: 'Warstwy i kolekcje: różne epoki, sztuka, książki, indywidualny charakter.',
+    hint: 'Layered, collected, characterful: mixed periods, art, books and individuality.',
     prompt: `A photorealistic interior photograph of a room in a London eclectic heritage style. Layered, collected and characterful: a tall sash window, a bookcase filled with well-read books beside it, gilt-framed paintings of mixed periods leaning against the wall and hung salon-style, a rich Persian rug on aged parquet, mixed eras of furniture and art that feel personally collected over years. Individual, cultured and full of character, yet composed.`,
   },
 ]
@@ -91,13 +91,13 @@ export const STYLES = [
 export const VALVES = {
   silver: {
     key: 'silver',
-    label: 'Srebrne przyłącza',
+    label: 'Silver valves',
     material:
       'polished silver nickel-chrome, a cool bright silver metal with crisp, clean specular reflections',
   },
   gold: {
     key: 'gold',
-    label: 'Złote przyłącza',
+    label: 'Gold valves',
     material:
       'polished brass with a warm golden tone, softly gleaming gold metal with warm reflections',
   },
@@ -167,7 +167,7 @@ ${PRODUCT_PARA}
 
 Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. It stands beneath the window, and it is rendered at an angle consistent with the camera perspective of image [1], so the two-column depth is readable.
 
-Connect the radiator to the two pipes rising from the floor using a pair of traditional angled radiator valves. ${VALVES_PARA}
+Add two pipes rising vertically out of the floor at the radiator's bottom outer corners, and connect the radiator to them using a pair of traditional angled radiator valves. ${VALVES_PARA}
 
 Everything else in image [1] stays exactly as it is: the walls, the window, the floor, every piece of furniture and every object, the framing, the camera position and the lens perspective. The result must be instantly recognisable as the same photograph with one addition: the radiator and its two valves.
 

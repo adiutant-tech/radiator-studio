@@ -55,7 +55,7 @@ function dataUrlToBlob(dataUrl) {
 // worker-openai.js) w polu "Proxy OpenAI" w Ustawieniach.
 async function openaiGenerate(prompt, imageDataUrls) {
   const key = getOpenaiKey()
-  if (!key) throw new Error('Brak klucza OpenAI. Uzupełnij go w ustawieniach.')
+  if (!key) throw new Error('Missing OpenAI API key. Add it in Settings.')
   const base = getOpenaiProxy() || 'https://api.openai.com'
   const model = getOpenaiModel()
 
@@ -88,17 +88,17 @@ async function openaiGenerate(prompt, imageDataUrls) {
 
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(body?.error?.message || `OpenAI odpowiedziało ${res.status}`)
+    throw new Error(body?.error?.message || `OpenAI responded with ${res.status}`)
   }
   const b64 = body?.data?.[0]?.b64_json
-  if (!b64) throw new Error('OpenAI nie zwróciło obrazu. Spróbuj ponownie.')
+  if (!b64) throw new Error('OpenAI returned no image. Please try again.')
   return `data:image/png;base64,${b64}`
 }
 
 // --- Gemini ---------------------------------------------------------------------
 async function geminiGenerate(prompt, imageDataUrls) {
   const key = getApiKey()
-  if (!key) throw new Error('Brak klucza Gemini. Uzupełnij go w ustawieniach.')
+  if (!key) throw new Error('Missing Gemini API key. Add it in Settings.')
 
   const payload = JSON.stringify({
     contents: [
@@ -123,7 +123,7 @@ async function geminiGenerate(prompt, imageDataUrls) {
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const msg = body?.error?.message || `Gemini odpowiedziało ${res.status}`
+    const msg = body?.error?.message || `Gemini responded with ${res.status}`
     throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
   }
   const candidate = body?.candidates?.[0]
@@ -132,7 +132,7 @@ async function geminiGenerate(prompt, imageDataUrls) {
   if (!inline?.data) {
     const reason =
       candidate?.finishReason || body?.promptFeedback?.blockReason || 'nieznany powód'
-    throw new Error(`Model nie zwrócił obrazu (${reason}). Spróbuj ponownie.`)
+    throw new Error(`The model returned no image (${reason}). Please try again.`)
   }
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`
 }
