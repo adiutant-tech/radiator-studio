@@ -132,7 +132,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.4'
+const APP_VERSION = 'v4.5'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -143,7 +143,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v11'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v12'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'

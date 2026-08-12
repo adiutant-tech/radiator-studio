@@ -173,7 +173,7 @@ export const COMPOSE_STYLED = `Image [1] is a photograph of an interior. Image [
 
 ${PRODUCT_PARA}
 
-Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. The radiator stands flat against the wall, centred beneath the window: its full width runs parallel to the wall and to the window sill, and its back sits only a few centimetres from the skirting board. Any perspective on the radiator comes purely from the camera position of image [1]; the radiator itself is never rotated, never angled away from the wall, and it never stands freely in the room. {FRAMING}
+Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space. The radiator stands flat against the wall beneath the window, its back parallel to the wall and to the window sill, a few centimetres in front of the skirting board; it is never rotated, never angled away from the wall and never freestanding in the room. CRITICAL: the output keeps exactly the same crop, framing and camera position as image [1]. Never zoom out, widen the view or pull the camera back to fit the radiator or the window in; if image [1] is a tight close-up, it is perfectly fine for the radiator to be cropped by the frame edges. {FRAMING}
 
 Add two pipes rising vertically out of the floor at the radiator's bottom outer corners, and connect the radiator to them using a pair of traditional angled radiator valves. ${VALVES_PARA}
 
@@ -190,7 +190,7 @@ export const COMPOSE_OWN = `Image [1] is a photograph of a real room. Image [2] 
 
 ${PRODUCT_PARA}
 
-Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space, the room accommodates the radiator, not the other way round. The radiator stands flat against the wall it is placed on: its full width runs parallel to that wall (and to the window sill, if it stands beneath a window), and its back sits only a few centimetres from the skirting board. Any perspective on the radiator comes purely from the camera position of image [1]; the radiator itself is never rotated, never angled away from the wall, and it never stands freely in the room.
+Preserve the radiator's real height and proportions from image [2]; do not scale, squash or stretch it to fit the space. The radiator stands flat against the wall it is placed on, its back parallel to that wall (and to the window sill, if it stands beneath a window), a few centimetres in front of the skirting board; it is never rotated, never angled away from the wall and never freestanding in the room. CRITICAL: the output keeps exactly the same crop, framing and camera position as image [1]. Never zoom out, widen the view or pull the camera back to fit the radiator in; if image [1] is a tight close-up, it is perfectly fine for the radiator to be cropped by the frame edges.
 
 Connect the radiator to two pipes rising vertically out of the floor; if no pipes are visible in image [1], add them discreetly at the radiator's bottom outer corners. ${VALVES_PARA}
 
