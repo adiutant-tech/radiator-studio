@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
-  PLATE_PROMPT,
+  PLATE_SCAFFOLD,
+  STYLES,
   FINISHES,
   VALVES,
   SECTION_VARIANTS,
-  COMPOSE_TEMPLATE,
+  COMPOSE_STYLED,
+  COMPOSE_OWN,
   FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
 } from './prompts.js'
@@ -93,20 +95,27 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v2.4'
+const APP_VERSION = 'v3.2'
+
+// Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
+const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 
 // --- Edytowalne prompty: domyślne wartości + zapis w localStorage -----------
 
 // Klucz jest wersjonowany: podbicie celowo porzuca edycje z localStorage,
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
-// v3: doświetlenie sceny i ornamentu (v2: ornament wszędzie, dwa zawory).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v3'
+// v5: dwa tory wnętrza (10 stylów z listingu / własne zdjęcie z osobnym
+// szablonem kompozycji), szkielet plate'a wspólny dla stylów.
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v5'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
+const STYLE_LS_KEY = 'radiator-studio-style'
 
 function defaultPrompts() {
   return {
-    plate: PLATE_PROMPT,
-    compose: COMPOSE_TEMPLATE,
+    plateScaffold: PLATE_SCAFFOLD,
+    styles: Object.fromEntries(STYLES.map((s) => [s.key, s.prompt])),
+    composeStyled: COMPOSE_STYLED,
+    composeOwn: COMPOSE_OWN,
     finishSwap: FINISH_SWAP_TEMPLATE,
     swap: VALVE_SWAP_TEMPLATE,
     finishes: Object.fromEntries(FINISHES.map((f) => [f.key, f.block])),
@@ -120,8 +129,10 @@ function loadPrompts() {
     if (!saved) return defaultPrompts()
     const d = defaultPrompts()
     return {
-      plate: saved.plate ?? d.plate,
-      compose: saved.compose ?? d.compose,
+      plateScaffold: saved.plateScaffold ?? d.plateScaffold,
+      styles: { ...d.styles, ...(saved.styles || {}) },
+      composeStyled: saved.composeStyled ?? d.composeStyled,
+      composeOwn: saved.composeOwn ?? d.composeOwn,
       finishSwap: saved.finishSwap ?? d.finishSwap,
       swap: saved.swap ?? d.swap,
       finishes: { ...d.finishes, ...(saved.finishes || {}) },
@@ -139,6 +150,17 @@ export default function App() {
   const [packshot, setPackshot] = useState(null)
   const [plate, setPlate] = useState(null)
   const [plateBusy, setPlateBusy] = useState(false)
+
+  // Tor wnętrza: 'style' (generowane z listingu) albo 'own' (własne zdjęcie).
+  // plateOrigin zapamiętuje, jak powstał AKTUALNY plate, bo od tego zależy,
+  // który szablon kompozycji zostanie użyty.
+  const [plateMode, setPlateMode] = useState('style')
+  const [plateOrigin, setPlateOrigin] = useState('style')
+  const [styleKey, setStyleKey] = useState(() => {
+    const saved = localStorage.getItem(STYLE_LS_KEY)
+    return STYLES.some((s) => s.key === saved) ? saved : 'classic-georgian'
+  })
+  const selectedStyle = STYLES.find((s) => s.key === styleKey)
 
   const [prompts, setPrompts] = useState(loadPrompts)
 
@@ -177,6 +199,13 @@ export default function App() {
     setPrompts((p) => ({ ...p, finishes: { ...p.finishes, [key]: text } }))
   const setValveMaterial = (key, text) =>
     setPrompts((p) => ({ ...p, valves: { ...p.valves, [key]: text } }))
+  const setStylePrompt = (key, text) =>
+    setPrompts((p) => ({ ...p, styles: { ...p.styles, [key]: text } }))
+
+  const saveStyleKey = (k) => {
+    setStyleKey(k)
+    localStorage.setItem(STYLE_LS_KEY, k)
+  }
 
   const resetPrompts = () => {
     if (confirm('Przywrócić wszystkie prompty do wartości domyślnych?')) {
@@ -190,8 +219,9 @@ export default function App() {
   }
 
   // Finalne prompty składane z szablonów. To dokładnie ten tekst idzie do modelu.
+  // Szablon kompozycji zależy od pochodzenia AKTUALNEGO plate'a.
   const buildComposePrompt = (finishKey, valveKey) =>
-    prompts.compose
+    (plateOrigin === 'own' ? prompts.composeOwn : prompts.composeStyled)
       .replaceAll('{FINISH}', prompts.finishes[finishKey])
       .replaceAll('{VALVE}', prompts.valves[valveKey])
       .replaceAll('{SECTIONS}', String(sectionVariant.sections))
@@ -215,8 +245,10 @@ export default function App() {
   const generatePlate = async () => {
     setPlateBusy(true)
     try {
-      const raw = await generateImage(prompts.plate, [])
+      const stylePrompt = `${prompts.styles[styleKey]}\n\n${prompts.plateScaffold}`
+      const raw = await generateImage(stylePrompt, [])
       setPlate(await recompress(raw))
+      setPlateOrigin('style')
     } catch (e) {
       alert(`Błąd generacji wnętrza: ${e.message}`)
     } finally {
@@ -397,33 +429,97 @@ export default function App() {
       <section className="card">
         <h2>Krok 2: Wnętrze referencyjne (scene plate)</h2>
         <p className="hint">
-          Generowane raz i używane dla całej serii, to gwarantuje, że wszystkie
-          warianty wyglądają na jedną sesję. Możesz też wgrać własne.
+          Jedno wnętrze na całą serię. Dwa tory: wygeneruj pokój w wybranym
+          stylu angielskim albo wgraj własne zdjęcie, każdy tor używa innego
+          szablonu kompozycji.
         </p>
+
         <div className="row">
-          <button onClick={generatePlate} disabled={plateBusy}>
-            {plateBusy ? 'Generuję wnętrze…' : 'Generuj wnętrze'}
-          </button>
-          <label className="upload-btn">
-            Wgraj własne
+          <label className="check">
             <input
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={async (e) =>
-                e.target.files[0] && setPlate(await fileToDataUrl(e.target.files[0]))
-              }
+              type="radio"
+              name="plateMode"
+              checked={plateMode === 'style'}
+              onChange={() => setPlateMode('style')}
             />
+            Generuj w stylu z listy
+          </label>
+          <label className="check">
+            <input
+              type="radio"
+              name="plateMode"
+              checked={plateMode === 'own'}
+              onChange={() => setPlateMode('own')}
+            />
+            Własne zdjęcie wnętrza
           </label>
         </div>
+
+        {plateMode === 'style' && (
+          <>
+            <div className="style-grid">
+              {STYLES.map((s) => (
+                <div
+                  key={s.key}
+                  className={`style-card ${styleKey === s.key ? 'selected' : ''}`}
+                  onClick={() => saveStyleKey(s.key)}
+                  title={s.hint}
+                >
+                  <img
+                    src={styleThumb(s.key)}
+                    alt={s.label}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                  <div className="style-card-label">{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <p className="hint">{selectedStyle.hint}</p>
+            <div className="row">
+              <button onClick={generatePlate} disabled={plateBusy}>
+                {plateBusy
+                  ? 'Generuję podgląd…'
+                  : `Generuj wnętrze: ${selectedStyle.label}`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {plateMode === 'own' && (
+          <div className="row">
+            <label className="upload-btn">
+              Wgraj zdjęcie wnętrza
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  if (!e.target.files[0]) return
+                  setPlate(await fileToDataUrl(e.target.files[0]))
+                  setPlateOrigin('own')
+                }}
+              />
+            </label>
+          </div>
+        )}
         {plate && (
-          <img
-            className="preview wide clickable"
-            src={plate}
-            alt="Scene plate"
-            title="Kliknij, aby powiększyć"
-            onClick={() => setLightbox(plate)}
-          />
+          <>
+            <img
+              className="preview wide clickable"
+              src={plate}
+              alt="Scene plate"
+              title="Kliknij, aby powiększyć"
+              onClick={() => setLightbox(plate)}
+            />
+            <p className="hint">
+              Miniatura powyżej to wnętrze, które zostanie użyte w serii
+              (źródło: {plateOrigin === 'own' ? 'własne zdjęcie' : 'styl z listy'}).
+              Nie podoba się? Generuj ponownie albo wgraj inne, zanim odpalisz serię.
+            </p>
+          </>
         )}
       </section>
 
@@ -438,20 +534,54 @@ export default function App() {
         </p>
 
         <details>
-          <summary>Prompt wnętrza (scene plate)</summary>
+          <summary>Style wnętrz ({STYLES.length}, każdy edytowalny osobno)</summary>
+          {STYLES.map((s) => (
+            <label key={s.key} className="block-label">
+              <span className="style-editor-head">
+                <img
+                  className="style-mini"
+                  src={styleThumb(s.key)}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+                {s.label}
+              </span>
+              <textarea
+                rows={5}
+                value={prompts.styles[s.key]}
+                onChange={(e) => setStylePrompt(s.key, e.target.value)}
+              />
+            </label>
+          ))}
+        </details>
+
+        <details>
+          <summary>Szkielet wnętrza (wspólny dla wszystkich stylów)</summary>
           <textarea
-            rows={12}
-            value={prompts.plate}
-            onChange={(e) => setPrompt({ plate: e.target.value })}
+            rows={8}
+            value={prompts.plateScaffold}
+            onChange={(e) => setPrompt({ plateScaffold: e.target.value })}
           />
         </details>
 
         <details>
-          <summary>Szablon kompozycji (packshot + wnętrze)</summary>
+          <summary>Szablon kompozycji: wnętrze generowane ze stylu</summary>
           <textarea
             rows={16}
-            value={prompts.compose}
-            onChange={(e) => setPrompt({ compose: e.target.value })}
+            value={prompts.composeStyled}
+            onChange={(e) => setPrompt({ composeStyled: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Szablon kompozycji: własne zdjęcie wnętrza</summary>
+          <textarea
+            rows={16}
+            value={prompts.composeOwn}
+            onChange={(e) => setPrompt({ composeOwn: e.target.value })}
           />
         </details>
 
