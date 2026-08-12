@@ -17,6 +17,7 @@ import {
   VALVES_REF_PAIR,
   SWAP_REF_SINGLE,
   SWAP_REF_PAIR,
+  PAIR_NOTE,
 } from './prompts.js'
 import {
   generateImage,
@@ -137,7 +138,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.0'
+const APP_VERSION = 'v5.1'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -148,7 +149,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v16'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v17'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -173,6 +174,7 @@ function defaultPrompts() {
     valvesRefPair: VALVES_REF_PAIR,
     swapRefSingle: SWAP_REF_SINGLE,
     swapRefPair: SWAP_REF_PAIR,
+    pairNote: PAIR_NOTE,
   }
 }
 
@@ -198,6 +200,7 @@ function loadPrompts() {
       valvesRefPair: saved.valvesRefPair ?? d.valvesRefPair,
       swapRefSingle: saved.swapRefSingle ?? d.swapRefSingle,
       swapRefPair: saved.swapRefPair ?? d.swapRefPair,
+      pairNote: saved.pairNote ?? d.pairNote,
     }
   } catch {
     return defaultPrompts()
@@ -340,7 +343,12 @@ export default function App() {
       )
 
   const buildFinishSwapPrompt = (finishKey) =>
-    prompts.finishSwap.replaceAll('{FINISH}', prompts.finishes[finishKey])
+    prompts.finishSwap
+      .replaceAll(
+        '{VALVE_NOTE}',
+        valveRef && valveRefMode === 'pair' ? prompts.pairNote : '',
+      )
+      .replaceAll('{FINISH}', prompts.finishes[finishKey])
 
   // --- ustawienia ----------------------------------------------------------
 
@@ -989,6 +997,14 @@ export default function App() {
               rows={3}
               value={prompts.swapRefSingle}
               onChange={(e) => setPrompt({ swapRefSingle: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Pair note (injected into every finish swap in "two valves" mode)
+            <textarea
+              rows={3}
+              value={prompts.pairNote}
+              onChange={(e) => setPrompt({ pairNote: e.target.value })}
             />
           </label>
           <label className="block-label">

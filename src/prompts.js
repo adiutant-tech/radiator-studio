@@ -231,9 +231,13 @@ export const FRAMING = {
 
 // --- KROK 3a: swap finiszu (z kadru master) ----------------------------------
 
-export const FINISH_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera angle, the framing, the lighting, the shadows, the valves and pipework, and the radiator's exact geometry, its section count, its position in the room and all of its casting detail. Change only the surface finish of the radiator body to the following, re-rendering its highlights, sheen and shadows so they are physically correct for the new material:
+export const FINISH_SWAP_TEMPLATE = `Keep everything in this image absolutely identical: the room, the camera angle, the framing, the lighting, the shadows, the valves and pipework, and the radiator's exact geometry, its section count, its position in the room and all of its casting detail. {VALVE_NOTE} Change only the surface finish of the radiator body to the following, re-rendering its highlights, sheen and shadows so they are physically correct for the new material:
 
 {FINISH}`
+
+// Nota o parze zaworów, wstrzykiwana do KAŻDEGO kroku serii w trybie "pair",
+// żeby edycje nie "naprawiały" celowej asymetrii do symetrii.
+export const PAIR_NOTE = `The radiator's two valves are intentionally DIFFERENT from each other: the control valve with the round handwheel is on the left, and the plain lockshield valve is on the right. Keep each valve exactly as it is, on its own side. Do not make the two valves match.`
 
 // --- KROK 3b: swap przyłączy (z gotowego kadru) -------------------------------
 
