@@ -134,7 +134,7 @@ async function toJpeg(dataUrl, quality = 0.95) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v4.8'
+const APP_VERSION = 'v4.9'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -145,7 +145,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v14'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v15'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -162,7 +162,9 @@ function defaultPrompts() {
     finishSwap: FINISH_SWAP_TEMPLATE,
     swap: VALVE_SWAP_TEMPLATE,
     finishes: Object.fromEntries(FINISHES.map((f) => [f.key, f.block])),
-    valves: { silver: VALVES.silver.material, gold: VALVES.gold.material },
+    valves: Object.fromEntries(
+      Object.values(VALVES).map((v) => [v.key, v.material]),
+    ),
     valveRefCompose: VALVE_REF_COMPOSE,
     valveRefSwap: VALVE_REF_SWAP,
   }
@@ -368,7 +370,7 @@ export default function App() {
   const plan = useMemo(() => {
     // Na każdy finisz: pełna kompozycja z pierwszym wybranym wariantem
     // przyłączy, drugi wariant jako edycja (swap zaworów) z gotowego kadru.
-    const order = ['silver', 'gold'].filter((v) => selValves.includes(v))
+    const order = Object.keys(VALVES).filter((v) => selValves.includes(v))
     return selFinishes.map((fk) => ({ finishKey: fk, valveOrder: order }))
   }, [selFinishes, selValves])
 
@@ -403,7 +405,7 @@ export default function App() {
 
     for (const p of plan) {
       if (cancelRef.current) break
-      const [firstValve, secondValve] = p.valveOrder
+      const [firstValve, ...restValves] = p.valveOrder
       let frameImg = null
 
       const firstId = cellId(p.finishKey, firstValve)
@@ -426,27 +428,28 @@ export default function App() {
         if (isMaster) masterFrame = frameImg
       } catch (e) {
         patchCell(firstId, { status: 'error', error: e.message })
-        if (secondValve)
-          patchCell(cellId(p.finishKey, secondValve), {
+        for (const rv of restValves)
+          patchCell(cellId(p.finishKey, rv), {
             status: 'error',
             error: 'Skipped: no base frame for this finish.',
           })
         continue
       }
 
-      // swap przyłączy z kadru tego finiszu
-      if (secondValve && !cancelRef.current) {
-        const secondId = cellId(p.finishKey, secondValve)
-        const swapPrompt = buildSwapPrompt(secondValve)
-        patchCell(secondId, { status: 'running', prompt: swapPrompt, sections })
+      // pozostałe warianty przyłączy: swap zaworów z kadru tego finiszu
+      for (const rv of restValves) {
+        if (cancelRef.current) break
+        const rvId = cellId(p.finishKey, rv)
+        const swapPrompt = buildSwapPrompt(rv)
+        patchCell(rvId, { status: 'running', prompt: swapPrompt, sections })
         try {
           const img = await generateImage(
             swapPrompt,
             valveSmall ? [frameImg, valveSmall] : [frameImg],
           )
-          patchCell(secondId, { status: 'done', img })
+          patchCell(rvId, { status: 'done', img })
         } catch (e) {
-          patchCell(secondId, { status: 'error', error: e.message })
+          patchCell(rvId, { status: 'error', error: e.message })
         }
       }
     }
@@ -619,13 +622,21 @@ export default function App() {
         <p className="hint">
           A product photo from the shop, ideally cut out on white. This is the source of truth for the casting geometry; the model is forbidden to change it. The image is automatically scaled to 1600 px before sending.
         </p>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={async (e) =>
-            e.target.files[0] && setPackshot(await fileToDataUrl(e.target.files[0]))
-          }
-        />
+        <div className="row">
+          <label className="upload-btn">
+            Upload packshot
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={async (e) =>
+                e.target.files[0] &&
+                setPackshot(await fileToDataUrl(e.target.files[0]))
+              }
+            />
+          </label>
+          {packshot && <button onClick={() => setPackshot(null)}>Remove</button>}
+        </div>
         {packshot && (
           <img
             className="preview clickable"
@@ -920,7 +931,7 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Valve materials (2)</summary>
+          <summary>Valve materials ({Object.keys(VALVES).length})</summary>
           {Object.values(VALVES).map((v) => (
             <label key={v.key} className="block-label">
               {v.label}

@@ -15,12 +15,12 @@
 
 // --- Wspólny szkielet plate'a (dokleja się do opisu każdego stylu) ----------
 
-// Kadr PRODUKTOWY: strefa pod parapetem ~70% ramki, maksimum faktury.
-export const PLATE_SCAFFOLD_PRODUCT = `The composition is a tight, product-focused view of the wall beneath the window. The empty stretch of bare wall and floor under the window sill fills roughly 70 percent of the frame; the sill and the lower part of the window run along the upper edge of the frame, and only a narrow band of the surrounding room shows at the sides. The wall beneath the window is completely empty and unobstructed, and the floor along it is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
+// Kadr PRODUKTOWY: strefa pod parapetem wypełnia PRAWIE CAŁĄ ramkę.
+export const PLATE_SCAFFOLD_PRODUCT = `The composition is an extremely tight, product-focused close-up of the wall directly beneath the window sill. The empty stretch of bare wall under the sill fills almost the entire frame, about 90 percent of it: the sill itself is only a thin band along the very top edge of the frame, a narrow strip of floor shows along the very bottom edge, and the sides of the frame are the wall itself, with no surrounding room visible at all. The wall beneath the window is completely empty and unobstructed, and the floor along it is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind.
 
-Bright, generous natural daylight floods in through the window, filling the space with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. Warm ambient bounce brightens every corner. No hard sun, no flash.
+Bright, generous natural daylight falls from the window above, filling the space with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. No hard sun, no flash.
 
-Shot on a full-frame camera with a 50 mm lens at f/8 from about 1.5 metres away, camera slightly below sill height, perfectly level, so all vertical lines stay vertical and there is no wide-angle distortion. Everything is critically sharp across the whole frame, with fine material textures clearly resolved: the grain of the plaster, the paint on the mouldings, the grain of the floor. Editorial product-in-interior photography: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
+Shot on a full-frame camera with an 85 mm lens at f/8 from about 1 metre away, camera at the mid-height of the under-sill zone, perfectly level, so all vertical lines stay vertical and there is no distortion. Everything is critically sharp across the whole frame at near-macro detail: the grain of the plaster, the brush marks in the paint on the skirting, the grain of the floor are all clearly resolved. Editorial product photography in an interior: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
 
 // Kadr SZEROKI: całe wnętrze, kontekst stylu.
 export const PLATE_SCAFFOLD_WIDE = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. The floor along the wall is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
@@ -108,6 +108,18 @@ export const VALVES = {
     label: 'Gold valves',
     material:
       'polished brass with a warm golden tone, softly gleaming gold metal with warm reflections',
+  },
+  'antique-brass': {
+    key: 'antique-brass',
+    label: 'Antique brass valves',
+    material:
+      'aged, unlacquered antique brass with a warm golden-brown patina: a muted, softly tarnished glow rather than polish, slightly darker in the recesses and around the fittings',
+  },
+  'satin-nickel': {
+    key: 'satin-nickel',
+    label: 'Satin nickel valves',
+    material:
+      'brushed satin nickel, a soft warm-grey silver metal with a fine brushed texture and a gentle diffuse sheen, no mirror-like reflections',
   },
 }
 
@@ -203,7 +215,7 @@ The finish of the radiator body: {FINISH}`
 // --- Dopiski kadru do szablonu kompozycji ({FRAMING}) ------------------------
 
 export const FRAMING = {
-  product: `The radiator is the hero of the photograph: it fills most of the frame beneath the window, close enough that the cast-iron surface texture, the crispness of the casting and the depth of the ornamental relief are clearly visible on every section.`,
+  product: `The radiator is the hero of the photograph and fills the frame almost edge to edge beneath the sill, so close that the image reads like a product detail shot: the cast-iron surface texture, the crispness of the casting edges and the full depth of the ornamental relief are rendered at near-macro detail on every visible section. If the radiator is wider than the frame, its outer sections are simply cropped by the frame edges; never zoom out to fit it in.`,
   wide: `The radiator sits naturally in the scene beneath the window, clearly visible and well lit, its texture and ornament legible, while the room around it remains an important part of the composition.`,
 }
 
