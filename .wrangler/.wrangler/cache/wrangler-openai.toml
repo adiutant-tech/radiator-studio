@@ -1,0 +1,7 @@
+name = "radiator-openai"
+main = "worker-openai.js"
+compatibility_date = "2026-08-01"
+
+# Po testach zawęź CORS:
+# [vars]
+# ALLOWED_ORIGIN = "https://adiutant-tech.github.io"

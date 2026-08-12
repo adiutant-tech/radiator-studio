@@ -9,8 +9,133 @@
 //  - API restrictions -> Generative Language API
 
 const LS_KEY = 'radiator-studio-gemini-key'
-const MODEL = 'gemini-2.5-flash-image'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
+const MODEL_LS_KEY = 'radiator-studio-model'
+export const DEFAULT_MODEL = 'gemini-2.5-flash-image'
+
+// --- silnik: 'gemini' (domyślny) albo 'openai' -------------------------------
+const ENGINE_LS_KEY = 'radiator-studio-engine'
+const OPENAI_KEY_LS = 'radiator-studio-openai-key'
+const OPENAI_MODEL_LS = 'radiator-studio-openai-model'
+const OPENAI_PROXY_LS = 'radiator-studio-openai-proxy'
+export const DEFAULT_OPENAI_MODEL = 'gpt-image-1'
+
+export const getEngine = () => localStorage.getItem(ENGINE_LS_KEY) || 'gemini'
+export const setEngine = (e) => localStorage.setItem(ENGINE_LS_KEY, e)
+export const getOpenaiKey = () => localStorage.getItem(OPENAI_KEY_LS) || ''
+export const setOpenaiKey = (k) => localStorage.setItem(OPENAI_KEY_LS, k.trim())
+export const getOpenaiModel = () =>
+  localStorage.getItem(OPENAI_MODEL_LS) || DEFAULT_OPENAI_MODEL
+export const setOpenaiModel = (m) =>
+  localStorage.setItem(OPENAI_MODEL_LS, m.trim() || DEFAULT_OPENAI_MODEL)
+export const getOpenaiProxy = () =>
+  (localStorage.getItem(OPENAI_PROXY_LS) || '').replace(/\/$/, '')
+export const setOpenaiProxy = (u) =>
+  localStorage.setItem(OPENAI_PROXY_LS, u.trim().replace(/\/$/, ''))
+
+export function getModel() {
+  return localStorage.getItem(MODEL_LS_KEY) || DEFAULT_MODEL
+}
+
+export function setModel(m) {
+  localStorage.setItem(MODEL_LS_KEY, m.trim() || DEFAULT_MODEL)
+}
+
+function dataUrlToBlob(dataUrl) {
+  const { mimeType, data } = splitDataUrl(dataUrl)
+  const bin = atob(data)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: mimeType })
+}
+
+// --- OpenAI Images API --------------------------------------------------------
+// Generations (bez obrazów) i Edits (z obrazami, multi-image + input_fidelity).
+// UWAGA: api.openai.com nie wysyła nagłówków CORS, wywołanie prosto z
+// przeglądarki zablokuje się. Ustaw proxy (Cloudflare Worker z worker/
+// worker-openai.js) w polu "Proxy OpenAI" w Ustawieniach.
+async function openaiGenerate(prompt, imageDataUrls) {
+  const key = getOpenaiKey()
+  if (!key) throw new Error('Brak klucza OpenAI. Uzupełnij go w ustawieniach.')
+  const base = getOpenaiProxy() || 'https://api.openai.com'
+  const model = getOpenaiModel()
+
+  let res
+  if (imageDataUrls.length === 0) {
+    res = await fetch(`${base}/v1/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ model, prompt, size: '1536x1024', quality: 'high' }),
+    })
+  } else {
+    const form = new FormData()
+    form.append('model', model)
+    form.append('prompt', prompt)
+    form.append('size', '1536x1024')
+    form.append('quality', 'high')
+    form.append('input_fidelity', 'high')
+    imageDataUrls.forEach((d, i) =>
+      form.append('image[]', dataUrlToBlob(d), `input_${i + 1}.jpg`),
+    )
+    res = await fetch(`${base}/v1/images/edits`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+    })
+  }
+
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(body?.error?.message || `OpenAI odpowiedziało ${res.status}`)
+  }
+  const b64 = body?.data?.[0]?.b64_json
+  if (!b64) throw new Error('OpenAI nie zwróciło obrazu. Spróbuj ponownie.')
+  return `data:image/png;base64,${b64}`
+}
+
+// --- Gemini ---------------------------------------------------------------------
+async function geminiGenerate(prompt, imageDataUrls) {
+  const key = getApiKey()
+  if (!key) throw new Error('Brak klucza Gemini. Uzupełnij go w ustawieniach.')
+
+  const payload = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          ...imageDataUrls.map((d) => {
+            const { mimeType, data } = splitDataUrl(d)
+            return { inline_data: { mime_type: mimeType, data } }
+          }),
+          { text: prompt },
+        ],
+      },
+    ],
+    generationConfig: { responseModalities: ['IMAGE'] },
+  })
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}:generateContent`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: payload,
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = body?.error?.message || `Gemini odpowiedziało ${res.status}`
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+  const candidate = body?.candidates?.[0]
+  const part = candidate?.content?.parts?.find((p) => p.inlineData || p.inline_data)
+  const inline = part?.inlineData || part?.inline_data
+  if (!inline?.data) {
+    const reason =
+      candidate?.finishReason || body?.promptFeedback?.blockReason || 'nieznany powód'
+    throw new Error(`Model nie zwrócił obrazu (${reason}). Spróbuj ponownie.`)
+  }
+  return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`
+}
 
 export function getApiKey() {
   return localStorage.getItem(LS_KEY) || ''
@@ -33,53 +158,19 @@ export function splitDataUrl(dataUrl) {
  * @returns {Promise<string>} dataURL wygenerowanego obrazu
  */
 export async function generateImage(prompt, imageDataUrls = []) {
-  const key = getApiKey()
-  if (!key) throw new Error('Brak klucza Gemini. Uzupełnij go w ustawieniach.')
-
-  const payload = JSON.stringify({
-    contents: [
-      {
-        parts: [
-          ...imageDataUrls.map((d) => {
-            const { mimeType, data } = splitDataUrl(d)
-            return { inline_data: { mime_type: mimeType, data } }
-          }),
-          { text: prompt },
-        ],
-      },
-    ],
-    generationConfig: { responseModalities: ['IMAGE'] },
-  })
-
+  const engine = getEngine()
   // Jedna automatyczna ponowna próba po 2 s przy błędach przejściowych.
   let lastError
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': key,
-        },
-        body: payload,
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        const msg = body?.error?.message || `Gemini odpowiedziało ${res.status}`
-        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
-      }
-      const candidate = body?.candidates?.[0]
-      const part = candidate?.content?.parts?.find((p) => p.inlineData || p.inline_data)
-      const inline = part?.inlineData || part?.inline_data
-      if (!inline?.data) {
-        const reason =
-          candidate?.finishReason || body?.promptFeedback?.blockReason || 'nieznany powód'
-        throw new Error(`Model nie zwrócił obrazu (${reason}). Spróbuj ponownie.`)
-      }
-      return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`
+      return engine === 'openai'
+        ? await openaiGenerate(prompt, imageDataUrls)
+        : await geminiGenerate(prompt, imageDataUrls)
     } catch (e) {
       lastError = e
-      const transient = /network|connection|fetch|502|timeout|overloaded|503/i.test(e.message)
+      const transient = /network|connection|fetch|502|timeout|overloaded|503|rate limit|429/i.test(
+        e.message,
+      )
       if (attempt === 1 && transient) {
         await new Promise((r) => setTimeout(r, 2000))
         continue

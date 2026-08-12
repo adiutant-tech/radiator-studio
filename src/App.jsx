@@ -11,7 +11,23 @@ import {
   FINISH_SWAP_TEMPLATE,
   VALVE_SWAP_TEMPLATE,
 } from './prompts.js'
-import { generateImage, getApiKey, setApiKey } from './api.js'
+import {
+  generateImage,
+  getApiKey,
+  setApiKey,
+  getModel,
+  setModel,
+  DEFAULT_MODEL,
+  getEngine,
+  setEngine,
+  getOpenaiKey,
+  setOpenaiKey,
+  getOpenaiModel,
+  setOpenaiModel,
+  getOpenaiProxy,
+  setOpenaiProxy,
+  DEFAULT_OPENAI_MODEL,
+} from './api.js'
 
 // ---------------------------------------------------------------------------
 
@@ -92,10 +108,29 @@ function download(dataUrl, name) {
   a.click()
 }
 
+// Konwersja do JPEG w NATYWNEJ rozdzielczości (bez skalowania):
+// zmienia format zapisu, nie jakość obrazu.
+async function toJpeg(dataUrl, quality = 0.95) {
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = reject
+    i.src = dataUrl
+  })
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v3.5'
+const APP_VERSION = 'v4.0'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -147,6 +182,11 @@ function loadPrompts() {
 
 export default function App() {
   const [apiKey, setApiKeyState] = useState(getApiKey())
+  const [modelId, setModelIdState] = useState(getModel())
+  const [engine, setEngineState] = useState(getEngine())
+  const [openaiKey, setOpenaiKeyState] = useState(getOpenaiKey())
+  const [openaiModel, setOpenaiModelState] = useState(getOpenaiModel())
+  const [openaiProxy, setOpenaiProxyState] = useState(getOpenaiProxy())
   const [packshot, setPackshot] = useState(null)
   const [plate, setPlate] = useState(null)
   const [plateBusy, setPlateBusy] = useState(false)
@@ -238,6 +278,28 @@ export default function App() {
   const saveApiKey = (v) => {
     setApiKeyState(v)
     setApiKey(v)
+  }
+
+  const saveModelId = (v) => {
+    setModelIdState(v)
+    setModel(v)
+  }
+
+  const saveEngine = (v) => {
+    setEngineState(v)
+    setEngine(v)
+  }
+  const saveOpenaiKey = (v) => {
+    setOpenaiKeyState(v)
+    setOpenaiKey(v)
+  }
+  const saveOpenaiModel = (v) => {
+    setOpenaiModelState(v)
+    setOpenaiModel(v)
+  }
+  const saveOpenaiProxy = (v) => {
+    setOpenaiProxyState(v)
+    setOpenaiProxy(v)
   }
 
   // --- plate ---------------------------------------------------------------
@@ -358,8 +420,8 @@ export default function App() {
     const zip = new JSZip()
     for (const [id, cell] of Object.entries(cells)) {
       if (cell.status !== 'done') continue
-      const base64 = cell.img.split(',')[1]
-      zip.file(`radiator_${cell.sections || sections}sekcji_${id}.png`, base64, {
+      const jpeg = await toJpeg(cell.img)
+      zip.file(`radiator_${cell.sections || sections}sekcji_${id}.jpg`, jpeg.split(',')[1], {
         base64: true,
       })
     }
@@ -387,20 +449,98 @@ export default function App() {
 
       <section className="card">
         <h2>Ustawienia</h2>
-        <label>
-          Klucz API Gemini (Google AI Studio)
-          <input
-            type="password"
-            placeholder="AIza..."
-            value={apiKey}
-            onChange={(e) => saveApiKey(e.target.value)}
-          />
-        </label>
+
+        <div className="row">
+          <label className="check">
+            <input
+              type="radio"
+              name="engine"
+              checked={engine === 'gemini'}
+              onChange={() => saveEngine('gemini')}
+            />
+            Gemini (Nano Banana), rekomendowany
+          </label>
+          <label className="check">
+            <input
+              type="radio"
+              name="engine"
+              checked={engine === 'openai'}
+              onChange={() => saveEngine('openai')}
+            />
+            OpenAI (GPT Image), eksperymentalny
+          </label>
+        </div>
         <p className="hint">
-          Klucz zostaje wyłącznie w tej przeglądarce (localStorage), appka woła
-          API Google bezpośrednio. W Google Cloud Console ogranicz klucz do
-          witryny https://adiutant-tech.github.io/* i do Generative Language API.
+          Gemini najlepiej trzyma formę odlewu i pokój (edycja z zachowaniem
+          tożsamości). OpenAI przerysowuje scenę, nawet z input_fidelity=high
+          spodziewaj się dryfu detalu; używaj do moodów i porównań, nie do
+          serii z gwarancją formy. Klucze zostają w tej przeglądarce.
         </p>
+
+        {engine === 'gemini' && (
+          <>
+            <label>
+              Klucz API Gemini (Google AI Studio)
+              <input
+                type="password"
+                placeholder="AIza..."
+                value={apiKey}
+                onChange={(e) => saveApiKey(e.target.value)}
+              />
+            </label>
+            <label>
+              Model obrazkowy
+              <input
+                type="text"
+                placeholder={DEFAULT_MODEL}
+                value={modelId}
+                onChange={(e) => saveModelId(e.target.value)}
+              />
+            </label>
+            <p className="hint">
+              Domyślny {DEFAULT_MODEL} generuje ~1 MP. Jeśli macie dostęp do
+              wariantu Pro (2K/4K), wpisz tu jego identyfikator.
+            </p>
+          </>
+        )}
+
+        {engine === 'openai' && (
+          <>
+            <label>
+              Klucz API OpenAI
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={openaiKey}
+                onChange={(e) => saveOpenaiKey(e.target.value)}
+              />
+            </label>
+            <label>
+              Model obrazkowy
+              <input
+                type="text"
+                placeholder={DEFAULT_OPENAI_MODEL}
+                value={openaiModel}
+                onChange={(e) => saveOpenaiModel(e.target.value)}
+              />
+            </label>
+            <label>
+              Proxy OpenAI (adres Cloudflare Workera)
+              <input
+                type="url"
+                placeholder="https://radiator-openai.twoj-worker.workers.dev"
+                value={openaiProxy}
+                onChange={(e) => saveOpenaiProxy(e.target.value)}
+              />
+            </label>
+            <p className="hint">
+              api.openai.com nie pozwala na wywołania z przeglądarki (brak
+              CORS), więc proxy jest w praktyce wymagane: wdróż worker/
+              worker-openai.js (instrukcja w README) i wklej tu jego adres.
+              Klucz nadal zostaje w przeglądarce, proxy tylko przekazuje ruch.
+            </p>
+          </>
+        )}
       </section>
 
       <section className="card">
@@ -753,10 +893,10 @@ export default function App() {
                       />
                       <div className="row">
                         <button
-                          onClick={() =>
+                          onClick={async () =>
                             download(
-                              cell.img,
-                              `radiator_${cell.sections || sections}sekcji_${id}.png`,
+                              await toJpeg(cell.img),
+                              `radiator_${cell.sections || sections}sekcji_${id}.jpg`,
                             )
                           }
                         >
