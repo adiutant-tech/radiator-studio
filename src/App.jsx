@@ -95,7 +95,7 @@ function download(dataUrl, name) {
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v3.2'
+const APP_VERSION = 'v3.4'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -104,9 +104,9 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 
 // Klucz jest wersjonowany: podbicie celowo porzuca edycje z localStorage,
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
-// v5: dwa tory wnętrza (10 stylów z listingu / własne zdjęcie z osobnym
-// szablonem kompozycji), szkielet plate'a wspólny dla stylów.
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v5'
+// v6: kompozycja jako EDYCJA pokoju (pokój = obraz [1], packshot = [2]),
+// framing "edit this photograph" zamiast "compose a scene".
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v6'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 
@@ -275,8 +275,9 @@ export default function App() {
     cancelRef.current = false
     setRunning(true)
 
-    // budżet bajtowy na oba wejścia łącznie (limit ~1 MiB na żądanie)
-    const [packshotSmall, plateSmall] = await fitBudget([packshot, plate])
+    // budżet bajtowy na oba wejścia łącznie
+    // KOLEJNOŚĆ MA ZNACZENIE: obraz [1] = pokój (baza edycji), [2] = packshot
+    const [plateSmall, packshotSmall] = await fitBudget([plate, packshot])
 
     const init = {}
     for (const p of plan)
@@ -299,7 +300,7 @@ export default function App() {
       const firstPrompt = isMaster
         ? buildComposePrompt(p.finishKey, firstValve)
         : buildFinishSwapPrompt(p.finishKey)
-      const inputs = isMaster ? [packshotSmall, plateSmall] : [masterFrame]
+      const inputs = isMaster ? [plateSmall, packshotSmall] : [masterFrame]
 
       patchCell(firstId, { status: 'running', prompt: firstPrompt, sections })
       try {
@@ -345,7 +346,8 @@ export default function App() {
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt, sections })
     try {
-      const img = await generateImage(prompt, await fitBudget([packshot, plate]))
+      // [1] = pokój (baza edycji), [2] = packshot
+      const img = await generateImage(prompt, await fitBudget([plate, packshot]))
       patchCell(id, { status: 'done', img })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
