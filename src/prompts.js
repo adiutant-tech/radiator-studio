@@ -22,21 +22,11 @@ Bright, generous natural daylight falls from the window above, filling the space
 
 Shot on a full-frame camera with an 85 mm lens at f/8 from about 1 metre away, camera at the mid-height of the under-sill zone, perfectly level, so all vertical lines stay vertical and there is no distortion. Everything is critically sharp across the whole frame at near-macro detail: the grain of the plaster, the brush marks in the paint on the skirting, the grain of the floor are all clearly resolved. Editorial product photography in an interior: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
 
-// Kadr SZEROKI: całe wnętrze, kontekst stylu.
-export const PLATE_SCAFFOLD_WIDE = `The wall directly beneath the window is completely empty and unobstructed. There is a clear, evenly lit stretch of bare wall and floor across the lower centre of the frame, roughly 1200 mm wide and 700 mm tall, with nothing standing in front of it. The floor along the wall is completely clean and bare: no pipes, no pipe stubs, no fittings and no radiator hardware of any kind anywhere in the room.
-
-Bright, generous natural daylight floods in through the window, filling the room with soft luminous light. The exposure is airy and high-key in character: shadows are open and gentle, and no part of the frame falls into heavy darkness. Warm ambient bounce brightens every corner. No hard sun, no flash.
-
-Shot on a full-frame camera with a 35 mm lens at f/5.6, camera at the height of the window sill, perfectly level, so all vertical lines stay vertical and there is no wide-angle distortion. Editorial interior photography in the style of World of Interiors: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
-
-
 // --- Plate z MINIATURY stylu (miniatura = obraz [1], v5.4) -------------------
 // Miniatura kafelka jest referencją generacji, żeby wynik odpowiadał temu,
 // co user widzi i wybiera. Fallback na tor tekstowy, gdy miniatury brak.
 
 export const PLATE_FROM_THUMB_PRODUCT = `Image [1] is the reference photograph of an interior. Recreate this exact interior as faithfully as possible: the same architecture, panelling, mouldings, window, curtains, wall colours, floor material, furnishings, camera position, framing and light. The result must read as the same room photographed moments later. Make only these adjustments: the stretch of wall beneath the window sill and the floor along it are completely empty and clean, with no radiator, no pipes, no pipe stubs, no fittings and no objects standing against that wall; and the scene is brightly, generously lit with an airy, high-key exposure. Everything is critically sharp, with fine material textures clearly resolved. The image contains no text, no lettering and no graphic overlays.`
-
-export const PLATE_FROM_THUMB_WIDE = `Image [1] is the style reference for an interior. Render the same room as a wider interior view: keep its architecture, panelling, mouldings, window design, curtains, wall colours, floor material, furnishings and mood exactly, and pull the camera back to show more of the room, shot with a 35 mm lens at the height of the window sill, perfectly level, with no wide-angle distortion. The wall directly beneath the window is completely empty and unobstructed, and the floor along it is completely clean and bare: no radiator, no pipes, no pipe stubs, no fittings and no objects standing against that wall. Bright, generous natural daylight, airy high-key exposure, open gentle shadows. Editorial interior photography: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
 
 // --- 10 stylów wnętrz (opis pokoju, edytowalny per styl) --------------------
 
@@ -237,12 +227,10 @@ ${LIGHT_PARA}
 
 The finish of the radiator body: {FINISH}`
 
-// --- Dopiski kadru do szablonu kompozycji ({FRAMING}) ------------------------
+// --- Dopisek kadru do szablonu kompozycji ({FRAMING}) ------------------------
+// Od v5.7 istnieje tylko kadr produktowy; wersja wide usunięta (v5.9).
 
-export const FRAMING = {
-  product: `The radiator is the hero of the photograph and fills the frame almost edge to edge beneath the sill, so close that the image reads like a product detail shot: the cast-iron surface texture, the crispness of the casting edges and every raised or recessed detail of the casting are rendered at near-macro detail on every visible section. If the radiator is wider than the frame, its outer sections are simply cropped by the frame edges; never zoom out to fit it in.`,
-  wide: `The radiator sits naturally in the scene beneath the window, clearly visible and well lit, its texture and casting detail legible, while the room around it remains an important part of the composition.`,
-}
+export const FRAMING_PRODUCT = `The radiator is the hero of the photograph and fills the frame almost edge to edge beneath the sill, so close that the image reads like a product detail shot: the cast-iron surface texture, the crispness of the casting edges and every raised or recessed detail of the casting are rendered at near-macro detail on every visible section. If the radiator is wider than the frame, its outer sections are simply cropped by the frame edges; never zoom out to fit it in.`
 
 // --- KROK 3a: swap finiszu (z kadru master) ----------------------------------
 
@@ -264,3 +252,25 @@ export const VALVE_SWAP_TEMPLATE = `Keep everything in this image absolutely ide
 export const SWAP_REF_SINGLE = `Image [2] is the exact product reference for the valves: keep both valves exactly this design, its body shape, handwheel, spindle and fittings, and change only their metal finish to the material specified above.`
 
 export const SWAP_REF_PAIR = `Image [2] is the exact product reference for the valves: keep each valve exactly as it is in the current image, the same design on the same side, the handwheel valve on the left and the plain lockshield on the right, and change only the metal finish of both valves and their pipework to the material specified above. Do not swap the two designs between sides.`
+
+// --- Auto-QA: weryfikacja wygenerowanych kadrów -------------------------------
+// Po każdej generacji tani model TEKSTOWY Gemini ogląda wynik i liczy sekcje;
+// przy pełnej kompozycji dodatkowo porównuje wzór z packshotem. Niezgodny kadr
+// jest odrzucany, a prompt generacji dostaje dopisek korygujący (poniżej).
+
+export const VERIFY_MASTER = `You are a meticulous quality inspector. Image [1] is a generated interior photograph containing exactly one cast iron radiator. Image [2] is the product packshot of the radiator that was supposed to be reproduced.
+
+First, count the vertical sections of the radiator in image [1] one by one, carefully. Count the repeating cast columns themselves, not the gaps between them. Then judge whether the radiator in image [1] follows the DESIGN of image [2]: the same section profile and column shape, the same foot design, and the same level of surface decoration (a plain reference stays plain, a decorated reference stays decorated). When judging the design, ignore the colour, the finish and the number of sections.
+
+Answer with JSON only, no other text: {"sections": <integer>, "design_match": <true or false>}`
+
+export const VERIFY_COUNT = `You are a meticulous quality inspector. The image is an interior photograph containing exactly one cast iron radiator. Count the vertical sections of the radiator one by one, carefully. Count the repeating cast columns themselves, not the gaps between them.
+
+Answer with JSON only, no other text: {"sections": <integer>}`
+
+// Dopiski korygujące doklejane do prompta przy ponowieniu po odrzuceniu przez QA.
+// {GOT} = ile sekcji wyszło, {SECTIONS}/{SECTIONS_WORD} = ile ma być.
+
+export const RETRY_NOTE_COUNT = `PREVIOUS ATTEMPT REJECTED BY QA: the radiator was built with {GOT} sections instead of {SECTIONS}. That is wrong. Build the radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections this time, and recount them one by one before finishing.`
+
+export const RETRY_NOTE_DESIGN = `PREVIOUS ATTEMPT REJECTED BY QA: the radiator did not follow the reference design in image [2]. Copy the section profile, column shape, foot design and surface decoration of image [2] exactly; a plain reference stays plain. Do not substitute a generic radiator design from memory.`

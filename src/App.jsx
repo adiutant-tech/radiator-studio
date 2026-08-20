@@ -2,10 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import {
   PLATE_SCAFFOLD_PRODUCT,
-  PLATE_SCAFFOLD_WIDE,
   PLATE_FROM_THUMB_PRODUCT,
-  PLATE_FROM_THUMB_WIDE,
-  FRAMING,
+  FRAMING_PRODUCT,
   STYLES,
   FINISHES,
   VALVES,
@@ -20,9 +18,14 @@ import {
   SWAP_REF_SINGLE,
   SWAP_REF_PAIR,
   PAIR_NOTE,
+  VERIFY_MASTER,
+  VERIFY_COUNT,
+  RETRY_NOTE_COUNT,
+  RETRY_NOTE_DESIGN,
 } from './prompts.js'
 import {
   generateImage,
+  verifyJson,
   getApiKey,
   setApiKey,
   getModel,
@@ -153,7 +156,11 @@ const sectionsEnum = (n) =>
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.7'
+const APP_VERSION = 'v5.9'
+
+// Auto-QA: maksymalna liczba prób generacji jednego kadru (1 + ponowienia)
+const QA_MAX_ATTEMPTS = 3
+const VERIFY_LS_KEY = 'radiator-studio-verify'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -172,11 +179,8 @@ const FRAME_LS_KEY = 'radiator-studio-frame'
 function defaultPrompts() {
   return {
     plateScaffoldProduct: PLATE_SCAFFOLD_PRODUCT,
-    plateScaffoldWide: PLATE_SCAFFOLD_WIDE,
     plateFromThumbProduct: PLATE_FROM_THUMB_PRODUCT,
-    plateFromThumbWide: PLATE_FROM_THUMB_WIDE,
-    framingProduct: FRAMING.product,
-    framingWide: FRAMING.wide,
+    framingProduct: FRAMING_PRODUCT,
     styles: Object.fromEntries(STYLES.map((s) => [s.key, s.prompt])),
     composeStyled: COMPOSE_STYLED,
     composeOwn: COMPOSE_OWN,
@@ -192,6 +196,10 @@ function defaultPrompts() {
     swapRefSingle: SWAP_REF_SINGLE,
     swapRefPair: SWAP_REF_PAIR,
     pairNote: PAIR_NOTE,
+    verifyMaster: VERIFY_MASTER,
+    verifyCount: VERIFY_COUNT,
+    retryNoteCount: RETRY_NOTE_COUNT,
+    retryNoteDesign: RETRY_NOTE_DESIGN,
   }
 }
 
@@ -202,11 +210,8 @@ function loadPrompts() {
     const d = defaultPrompts()
     return {
       plateScaffoldProduct: saved.plateScaffoldProduct ?? d.plateScaffoldProduct,
-      plateScaffoldWide: saved.plateScaffoldWide ?? d.plateScaffoldWide,
       plateFromThumbProduct: saved.plateFromThumbProduct ?? d.plateFromThumbProduct,
-      plateFromThumbWide: saved.plateFromThumbWide ?? d.plateFromThumbWide,
       framingProduct: saved.framingProduct ?? d.framingProduct,
-      framingWide: saved.framingWide ?? d.framingWide,
       styles: { ...d.styles, ...(saved.styles || {}) },
       composeStyled: saved.composeStyled ?? d.composeStyled,
       composeOwn: saved.composeOwn ?? d.composeOwn,
@@ -220,6 +225,10 @@ function loadPrompts() {
       swapRefSingle: saved.swapRefSingle ?? d.swapRefSingle,
       swapRefPair: saved.swapRefPair ?? d.swapRefPair,
       pairNote: saved.pairNote ?? d.pairNote,
+      verifyMaster: saved.verifyMaster ?? d.verifyMaster,
+      verifyCount: saved.verifyCount ?? d.verifyCount,
+      retryNoteCount: saved.retryNoteCount ?? d.retryNoteCount,
+      retryNoteDesign: saved.retryNoteDesign ?? d.retryNoteDesign,
     }
   } catch {
     return defaultPrompts()
@@ -247,10 +256,7 @@ export default function App() {
   // który szablon kompozycji zostanie użyty.
   const [plateMode, setPlateMode] = useState('style')
   const [plateOrigin, setPlateOrigin] = useState('style')
-  // Kadr na stałe produktowy (wide usunięty na życzenie usera, v5.7)
-  const frameMode = 'product'
-  const plateFrame = 'product'
-  const setPlateFrame = () => {}
+  // Kadr na stałe produktowy: wide usunięty z UI (v5.7) i z promptów (v5.9)
   const [styleKey, setStyleKey] = useState(() => {
     const saved = localStorage.getItem(STYLE_LS_KEY)
     return STYLES.some((s) => s.key === saved) ? saved : 'classic-georgian'
@@ -271,6 +277,14 @@ export default function App() {
   // cells: { [id]: {status, img, error, prompt} }
   const [cells, setCells] = useState({})
   const [running, setRunning] = useState(false)
+  // Auto-QA włączone domyślnie; wyłączenie zapamiętywane w localStorage.
+  const [verifyOn, setVerifyOn] = useState(
+    () => localStorage.getItem(VERIFY_LS_KEY) !== '0',
+  )
+  const saveVerifyOn = (on) => {
+    setVerifyOn(on)
+    localStorage.setItem(VERIFY_LS_KEY, on ? '1' : '0')
+  }
   const [lightbox, setLightbox] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [promptsOpen, setPromptsOpen] = useState(false)
@@ -346,10 +360,7 @@ export default function App() {
       .replaceAll('{SECTIONS_ENUM}', sectionsEnum(sectionVariant.sections))
       .replaceAll('{WIDTH_NOTE}', widthNote(sectionVariant.sections))
       .replaceAll('{WIDTH_MM}', String(sectionVariant.width))
-      .replaceAll(
-        '{FRAMING}',
-        plateFrame === 'wide' ? prompts.framingWide : prompts.framingProduct,
-      )
+      .replaceAll('{FRAMING}', prompts.framingProduct)
 
   const buildSwapPrompt = (valveKey) =>
     prompts.swap
@@ -370,6 +381,76 @@ export default function App() {
         valveRef && valveRefMode === 'pair' ? prompts.pairNote : '',
       )
       .replaceAll('{FINISH}', prompts.finishes[finishKey])
+
+  // --- Auto-QA: generacja z weryfikacją i automatycznym ponowieniem ---------
+  // Po każdej generacji tani model TEKSTOWY Gemini liczy sekcje na wyniku,
+  // a przy pełnej kompozycji dodatkowo porównuje wzór z packshotem. Kadr
+  // niezgodny jest odrzucany, prompt dostaje dopisek korygujący i generacja
+  // idzie ponownie, łącznie do QA_MAX_ATTEMPTS prób. Gdy weryfikacja jest
+  // niemożliwa (brak klucza Gemini, błąd sieci), kadr przyjmowany jest bez
+  // weryfikacji - QA nigdy nie blokuje pracy.
+
+  const retryNoteCountText = (got) =>
+    prompts.retryNoteCount
+      .replaceAll('{GOT}', String(got))
+      .replaceAll('{SECTIONS}', String(sections))
+      .replaceAll('{SECTIONS_WORD}', SECTION_WORDS[sections] || String(sections))
+
+  // checkDesign: packshot (dataURL) => QA porównuje też wzór; null => tylko liczba
+  const generateVerified = async (basePrompt, inputs, { checkDesign = null, noteCellId = null } = {}) => {
+    if (!verifyOn) return { img: await generateImage(basePrompt, inputs), verify: null }
+    let best = null
+    let addendum = ''
+    for (let attempt = 1; attempt <= QA_MAX_ATTEMPTS; attempt++) {
+      const img = await generateImage(
+        addendum ? `${basePrompt}\n\n${addendum}` : basePrompt,
+        inputs,
+      )
+      const [imgSmall] = await fitBudget([img])
+      const v = await verifyJson(
+        checkDesign ? prompts.verifyMaster : prompts.verifyCount,
+        checkDesign ? [imgSmall, checkDesign] : [imgSmall],
+      )
+      const got = Number(v?.sections)
+      if (!v || !Number.isFinite(got)) return { img, verify: null }
+      const okCount = got === sections
+      const okDesign = checkDesign ? v.design_match !== false : true
+      const cand = {
+        img,
+        verify: {
+          got,
+          want: sections,
+          designMatch: checkDesign ? v.design_match !== false : null,
+          attempts: attempt,
+          ok: okCount && okDesign,
+        },
+      }
+      if (okCount && okDesign) return cand
+      if (
+        !best ||
+        Math.abs(got - sections) < Math.abs(best.verify.got - sections) ||
+        (Math.abs(got - sections) === Math.abs(best.verify.got - sections) &&
+          okDesign &&
+          best.verify.designMatch === false)
+      )
+        best = cand
+      addendum = [
+        okCount ? null : retryNoteCountText(got),
+        okDesign ? null : prompts.retryNoteDesign,
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+      if (attempt === QA_MAX_ATTEMPTS)
+        best = { ...best, verify: { ...best.verify, attempts: QA_MAX_ATTEMPTS } }
+      if (noteCellId && attempt < QA_MAX_ATTEMPTS)
+        patchCell(noteCellId, {
+          qa: `QA rejected attempt ${attempt}: ${got} sections${
+            checkDesign && v.design_match === false ? ', design mismatch' : ''
+          }. Retrying (${attempt + 1}/${QA_MAX_ATTEMPTS})…`,
+        })
+    }
+    return best
+  }
 
   // --- ustawienia ----------------------------------------------------------
 
@@ -426,21 +507,14 @@ export default function App() {
       // Tor główny: MINIATURA stylu jako obraz [1], wynik ma odpowiadać
       // temu, co user widzi na kafelku. Fallback: stary tor tekstowy.
       const thumb = await loadStyleThumb(styleKey)
-      let raw
-      if (thumb) {
-        const prompt =
-          frameMode === 'wide'
-            ? prompts.plateFromThumbWide
-            : prompts.plateFromThumbProduct
-        raw = await generateImage(prompt, [thumb])
-      } else {
-        const scaffold =
-          frameMode === 'wide' ? prompts.plateScaffoldWide : prompts.plateScaffoldProduct
-        raw = await generateImage(`${prompts.styles[styleKey]}\n\n${scaffold}`, [])
-      }
+      const raw = thumb
+        ? await generateImage(prompts.plateFromThumbProduct, [thumb])
+        : await generateImage(
+            `${prompts.styles[styleKey]}\n\n${prompts.plateScaffoldProduct}`,
+            [],
+          )
       setPlate(await recompress(raw))
       setPlateOrigin('style')
-      setPlateFrame(frameMode)
     } catch (e) {
       alert(`Interior generation failed: ${e.message}`)
     } finally {
@@ -502,10 +576,17 @@ export default function App() {
           : [plateSmall, packshotSmall]
         : [masterFrame]
 
-      patchCell(firstId, { status: 'running', prompt: firstPrompt, sections })
+      patchCell(firstId, { status: 'running', prompt: firstPrompt, sections, qa: null, verify: null })
       try {
-        frameImg = await generateImage(firstPrompt, inputs)
-        patchCell(firstId, { status: 'done', img: frameImg })
+        // QA: master jest sprawdzany także pod kątem zgodności WZORU
+        // z packshotem; kolejne finisze dziedziczą wzór z mastera, więc
+        // dla nich wystarczy sama liczba sekcji.
+        const res = await generateVerified(firstPrompt, inputs, {
+          checkDesign: isMaster ? packshotSmall : null,
+          noteCellId: firstId,
+        })
+        frameImg = res.img
+        patchCell(firstId, { status: 'done', img: frameImg, verify: res.verify, qa: null })
         // kadr posłuży jako wejście kolejnych edycji: zmieść w budżecie
         ;[frameImg] = await fitBudget([frameImg])
         if (isMaster) masterFrame = frameImg
@@ -524,13 +605,14 @@ export default function App() {
         if (cancelRef.current) break
         const rvId = cellId(p.finishKey, rv)
         const swapPrompt = buildSwapPrompt(rv)
-        patchCell(rvId, { status: 'running', prompt: swapPrompt, sections })
+        patchCell(rvId, { status: 'running', prompt: swapPrompt, sections, qa: null, verify: null })
         try {
-          const img = await generateImage(
+          const res = await generateVerified(
             swapPrompt,
             valveSmall ? [frameImg, valveSmall] : [frameImg],
+            { noteCellId: rvId },
           )
-          patchCell(rvId, { status: 'done', img })
+          patchCell(rvId, { status: 'done', img: res.img, verify: res.verify, qa: null })
         } catch (e) {
           patchCell(rvId, { status: 'error', error: e.message })
         }
@@ -548,14 +630,17 @@ export default function App() {
     }
     const id = cellId(finishKey, valveKey)
     const prompt = buildComposePrompt(finishKey, valveKey)
-    patchCell(id, { status: 'running', error: null, prompt, sections })
+    patchCell(id, { status: 'running', error: null, prompt, sections, qa: null, verify: null })
     try {
       // [1] = pokój (baza edycji), [2] = packshot, [3] = opcjonalny zawór
-      const img = await generateImage(
-        prompt,
-        await fitBudget(valveRef ? [plate, packshot, valveRef] : [plate, packshot]),
+      const inputs = await fitBudget(
+        valveRef ? [plate, packshot, valveRef] : [plate, packshot],
       )
-      patchCell(id, { status: 'done', img })
+      const res = await generateVerified(prompt, inputs, {
+        checkDesign: inputs[1],
+        noteCellId: id,
+      })
+      patchCell(id, { status: 'done', img: res.img, verify: res.verify, qa: null })
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
     }
@@ -932,15 +1017,6 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Plate from style thumbnail: wide frame (thumbnail = image [1])</summary>
-          <textarea
-            rows={7}
-            value={prompts.plateFromThumbWide}
-            onChange={(e) => setPrompt({ plateFromThumbWide: e.target.value })}
-          />
-        </details>
-
-        <details>
           <summary>Interior scaffold: product close-up frame (fallback, no thumbnail)</summary>
           <textarea
             rows={8}
@@ -950,32 +1026,12 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Interior scaffold: wide frame</summary>
+          <summary>Framing add-on: product close-up ({'{FRAMING}'})</summary>
           <textarea
-            rows={8}
-            value={prompts.plateScaffoldWide}
-            onChange={(e) => setPrompt({ plateScaffoldWide: e.target.value })}
+            rows={4}
+            value={prompts.framingProduct}
+            onChange={(e) => setPrompt({ framingProduct: e.target.value })}
           />
-        </details>
-
-        <details>
-          <summary>Framing add-ons for composition ({'{FRAMING}'})</summary>
-          <label className="block-label">
-            Product close-up
-            <textarea
-              rows={3}
-              value={prompts.framingProduct}
-              onChange={(e) => setPrompt({ framingProduct: e.target.value })}
-            />
-          </label>
-          <label className="block-label">
-            Wide interior
-            <textarea
-              rows={3}
-              value={prompts.framingWide}
-              onChange={(e) => setPrompt({ framingWide: e.target.value })}
-            />
-          </label>
         </details>
 
         <details>
@@ -1094,10 +1150,46 @@ export default function App() {
           ))}
         </details>
 
+        <details>
+          <summary>Auto-QA (verification & retry notes)</summary>
+          <label className="block-label">
+            QA check: full composition (counts sections + compares design with packshot)
+            <textarea
+              rows={6}
+              value={prompts.verifyMaster}
+              onChange={(e) => setPrompt({ verifyMaster: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            QA check: swap frames (counts sections only)
+            <textarea
+              rows={4}
+              value={prompts.verifyCount}
+              onChange={(e) => setPrompt({ verifyCount: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Retry note: wrong section count ({'{GOT}'} / {'{SECTIONS}'} filled in automatically)
+            <textarea
+              rows={3}
+              value={prompts.retryNoteCount}
+              onChange={(e) => setPrompt({ retryNoteCount: e.target.value })}
+            />
+          </label>
+          <label className="block-label">
+            Retry note: design mismatch with packshot
+            <textarea
+              rows={3}
+              value={prompts.retryNoteDesign}
+              onChange={(e) => setPrompt({ retryNoteDesign: e.target.value })}
+            />
+          </label>
+        </details>
+
         <div className="row">
           <button onClick={resetPrompts}>Restore defaults</button>
         </div>
-      
+
           </div>
         </div>
       )}
@@ -1157,6 +1249,17 @@ export default function App() {
           </div>
         </div>
 
+        <label className="check qa-toggle">
+          <input
+            type="checkbox"
+            checked={verifyOn}
+            onChange={(e) => saveVerifyOn(e.target.checked)}
+          />
+          Auto-QA: verify each frame (section count + packshot design), auto-retry
+          up to {QA_MAX_ATTEMPTS} attempts. Extra cost only when a frame fails QA.
+          Uses the Gemini key for checking.
+        </label>
+
         <div className="row">
           <button
             className="primary"
@@ -1196,7 +1299,12 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                  {cell?.status === 'running' && <div className="spinner" />}
+                  {cell?.status === 'running' && (
+                    <>
+                      <div className="spinner" />
+                      {cell.qa && <p className="qa-note">{cell.qa}</p>}
+                    </>
+                  )}
                   {cell?.status === 'error' && (
                     <div className="error">
                       <p>{cell.error}</p>
@@ -1227,6 +1335,17 @@ export default function App() {
                         </button>
                         <button onClick={() => retryCell(p.finishKey, v)}>Retry</button>
                       </div>
+                      {cell.verify && (
+                        <p className={`verify ${cell.verify.ok ? 'ok' : 'bad'}`}>
+                          {cell.verify.ok
+                            ? `✓ QA: ${cell.verify.want} sections confirmed${
+                                cell.verify.designMatch ? ', design matches packshot' : ''
+                              }${cell.verify.attempts > 1 ? ` (attempt ${cell.verify.attempts})` : ''}`
+                            : `⚠ QA: best of ${cell.verify.attempts} attempts shows ${cell.verify.got} sections (wanted ${cell.verify.want})${
+                                cell.verify.designMatch === false ? ' and misses the packshot design' : ''
+                              }`}
+                        </p>
+                      )}
                     </>
                   )}
                   {cell?.prompt && (

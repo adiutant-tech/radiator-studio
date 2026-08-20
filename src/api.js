@@ -137,6 +137,52 @@ async function geminiGenerate(prompt, imageDataUrls) {
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`
 }
 
+// --- Auto-QA: tekstowa weryfikacja kadru przez tani model Gemini --------------
+// Zwraca sparsowany obiekt JSON albo null, gdy weryfikacja jest niemożliwa
+// (brak klucza Gemini, błąd sieci, niesparsowalna odpowiedź). null NIGDY nie
+// blokuje generacji - kadr jest wtedy przyjmowany bez weryfikacji.
+// QA zawsze idzie przez Gemini, także przy silniku OpenAI (proxy przepuszcza
+// tylko /v1/images/*, a klucz Gemini i tak jest w Ustawieniach).
+export const VERIFY_MODEL = 'gemini-2.5-flash'
+
+export async function verifyJson(prompt, imageDataUrls = []) {
+  const key = getApiKey()
+  if (!key) return null
+  try {
+    const payload = JSON.stringify({
+      contents: [
+        {
+          parts: [
+            ...imageDataUrls.map((d) => {
+              const { mimeType, data } = splitDataUrl(d)
+              return { inline_data: { mime_type: mimeType, data } }
+            }),
+            { text: prompt },
+          ],
+        },
+      ],
+      generationConfig: { responseMimeType: 'application/json' },
+    })
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${VERIFY_MODEL}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: payload,
+      },
+    )
+    const body = await res.json().catch(() => null)
+    if (!res.ok || !body) return null
+    const text = (body?.candidates?.[0]?.content?.parts || [])
+      .map((p) => p.text || '')
+      .join('')
+    const m = text.match(/\{[\s\S]*\}/)
+    return m ? JSON.parse(m[0]) : null
+  } catch {
+    return null
+  }
+}
+
 export function getApiKey() {
   return localStorage.getItem(LS_KEY) || ''
 }

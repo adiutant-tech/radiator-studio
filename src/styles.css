@@ -241,6 +241,19 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
 }
 .lightbox-hint { color: #cfcbc2; font-size: 13px; }
 
+.qa-toggle { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+.qa-note {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0 0 8px;
+}
+
+.verify { font-size: 12px; margin: 8px 0 0; }
+.verify.ok { color: #2f6b3a; }
+.verify.bad { color: var(--error); }
+
 .cell-empty {
   display: flex;
   align-items: center;
