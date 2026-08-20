@@ -182,7 +182,7 @@ export const SECTION_VARIANTS = [
 
 const PRODUCT_PARA = `THE RADIATOR HAS EXACTLY {SECTIONS} ({SECTIONS_WORD}) SECTIONS. {SECTIONS_ENUM} The section count comes ONLY from this instruction. Image [2] may show a radiator with a different number of sections; its count carries no weight at all, only its design does.
 
-For everything else, image [2] is the single source of truth for the radiator's design AND its proportions. Copy one to one: the silhouette, the real height-to-width proportions of a SINGLE section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the shape of its feet, and the valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the corresponding sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it. Build the radiator by repeating the single-section design from image [2] exactly {SECTIONS} times, evenly spaced, approximately {WIDTH_MM} mm wide in total. It is a sectional cast iron column radiator; the number of columns in depth, and the front-to-back profile, follow image [2] exactly.`
+For everything else, image [2] is the single source of truth for the radiator's design AND its proportions. Copy one to one: the silhouette, the real height-to-width proportions of a SINGLE section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the shape of its feet, and the valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the corresponding sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it. Build the radiator by repeating the single-section design from image [2] exactly {SECTIONS} times, evenly spaced, approximately {WIDTH_MM} mm wide in total: {WIDTH_NOTE} It is a sectional cast iron column radiator; the number of columns in depth, and the front-to-back profile, follow image [2] exactly.`
 
 // --- Bloki zaworów: wybierane AUTOMATYCZNIE przez appkę --------------------
 // generic: brak zdjęcia zaworu; refSingle: zdjęcie z jednym zaworem;
@@ -202,7 +202,9 @@ const LIGHT_PARA = `Integrate the radiator into the photograph seamlessly. Follo
 // Plate ze szkieletu zawsze ma okno, pustą ścianę i rurki, więc szablon może
 // się do nich odwoływać wprost.
 
-export const COMPOSE_STYLED = `Image [1] is a photograph of an interior. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph, standing on the floor against the wall directly beneath the window. This is an edit of image [1], not a new scene.
+export const COMPOSE_STYLED = `TASK: add ONE cast iron radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections into the photograph below. The section count {SECTIONS} is the single most important requirement of this task.
+
+Image [1] is a photograph of an interior. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph, standing on the floor against the wall directly beneath the window. This is an edit of image [1], not a new scene.
 
 ${PRODUCT_PARA}
 
@@ -219,7 +221,9 @@ The finish of the radiator body: {FINISH}`
 // --- KROK 2b: kompozycja dla WŁASNEGO ZDJĘCIA (wnętrze dowolne) --------------
 // Zero założeń o pokoju: bez okna, bez parkietu, bez kierunku światła.
 
-export const COMPOSE_OWN = `Image [1] is a photograph of a real room. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph. It stands on the floor against a clear stretch of wall visible in image [1]: beneath the window if there is one, otherwise in the most natural empty spot for a radiator. This is an edit of the photograph, not a new scene.
+export const COMPOSE_OWN = `TASK: add ONE cast iron radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections into the photograph below. The section count {SECTIONS} is the single most important requirement of this task.
+
+Image [1] is a photograph of a real room. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph. It stands on the floor against a clear stretch of wall visible in image [1]: beneath the window if there is one, otherwise in the most natural empty spot for a radiator. This is an edit of the photograph, not a new scene.
 
 ${PRODUCT_PARA}
 

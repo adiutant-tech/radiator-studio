@@ -155,6 +155,7 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
   justify-content: center;
   padding: 6vh 16px;
 }
+.modal-wide { max-width: 860px; }
 .modal-box {
   background: var(--card);
   border: 1px solid var(--border);

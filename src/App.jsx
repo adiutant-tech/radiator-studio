@@ -141,13 +141,19 @@ async function toJpeg(dataUrl, quality = 0.95) {
 // Liczenie to najsłabszy punkt modeli obrazkowych: cyfra + słowo + wyliczanka
 // sekcja po sekcji dają najwyższą zgodność liczby sekcji.
 const SECTION_WORDS = { 4: 'four', 6: 'six', 8: 'eight', 10: 'ten', 12: 'twelve', 14: 'fourteen' }
+const widthNote = (n) =>
+  n <= 6
+    ? 'a small, narrow radiator, clearly narrower than the window above it, occupying only part of the wall.'
+    : n <= 10
+      ? 'a medium-width radiator, narrower than the window above it.'
+      : 'a wide radiator, spanning most of the width of the window above it.'
 const sectionsEnum = (n) =>
   `Counting from the left, the sections are: ${Array.from({ length: n }, (_, i) => `section ${i + 1}`).join(', ')}. After section ${n} the radiator ends with its end column and its foot; the total is exactly ${n} sections.`
 
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.6'
+const APP_VERSION = 'v5.7'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -158,7 +164,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v22'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v23'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -241,16 +247,10 @@ export default function App() {
   // który szablon kompozycji zostanie użyty.
   const [plateMode, setPlateMode] = useState('style')
   const [plateOrigin, setPlateOrigin] = useState('style')
-  // Kadr wybierany przy generowaniu; plateFrame = kadr AKTUALNEGO plate'a,
-  // od niego zależy dopisek {FRAMING} w szablonie kompozycji.
-  const [frameMode, setFrameMode] = useState(
-    () => localStorage.getItem(FRAME_LS_KEY) || 'product',
-  )
-  const [plateFrame, setPlateFrame] = useState('product')
-  const saveFrameMode = (v) => {
-    setFrameMode(v)
-    localStorage.setItem(FRAME_LS_KEY, v)
-  }
+  // Kadr na stałe produktowy (wide usunięty na życzenie usera, v5.7)
+  const frameMode = 'product'
+  const plateFrame = 'product'
+  const setPlateFrame = () => {}
   const [styleKey, setStyleKey] = useState(() => {
     const saved = localStorage.getItem(STYLE_LS_KEY)
     return STYLES.some((s) => s.key === saved) ? saved : 'classic-georgian'
@@ -273,15 +273,20 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const [lightbox, setLightbox] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [promptsOpen, setPromptsOpen] = useState(false)
   const cancelRef = useRef(false)
 
-  // Esc zamyka okno ustawień
+  // Esc zamyka okna modalne
   useEffect(() => {
-    if (!settingsOpen) return
-    const onKey = (e) => e.key === 'Escape' && setSettingsOpen(false)
+    if (!settingsOpen && !promptsOpen) return
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setSettingsOpen(false)
+      setPromptsOpen(false)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen])
+  }, [settingsOpen, promptsOpen])
 
   // Esc zamyka podgląd
   useEffect(() => {
@@ -339,6 +344,7 @@ export default function App() {
       .replaceAll('{SECTIONS}', String(sectionVariant.sections))
       .replaceAll('{SECTIONS_WORD}', SECTION_WORDS[sectionVariant.sections] || String(sectionVariant.sections))
       .replaceAll('{SECTIONS_ENUM}', sectionsEnum(sectionVariant.sections))
+      .replaceAll('{WIDTH_NOTE}', widthNote(sectionVariant.sections))
       .replaceAll('{WIDTH_MM}', String(sectionVariant.width))
       .replaceAll(
         '{FRAMING}',
@@ -585,7 +591,8 @@ export default function App() {
             One reference interior, six finishes, silver or gold valves.
           </p>
         </div>
-        <button className="settings-btn" onClick={() => setSettingsOpen(true)}>
+        <div className="row">
+          <button className="settings-btn" onClick={() => setSettingsOpen(true)}>
           ⚙ Settings
           {((engine === 'gemini' && !apiKey) ||
             (engine === 'openai' && !openaiKey)) && (
@@ -594,6 +601,10 @@ export default function App() {
             </span>
           )}
         </button>
+          <button className="settings-btn" onClick={() => setPromptsOpen(true)}>
+            ✎ Prompts
+          </button>
+        </div>
       </header>
 
       {settingsOpen && (
@@ -827,26 +838,7 @@ export default function App() {
               ))}
             </div>
             <p className="hint">{selectedStyle.hint}</p>
-            <div className="row">
-              <label className="check">
-                <input
-                  type="radio"
-                  name="frameMode"
-                  checked={frameMode === 'product'}
-                  onChange={() => saveFrameMode('product')}
-                />
-                Frame: product close-up (under-sill fills the frame)
-              </label>
-              <label className="check">
-                <input
-                  type="radio"
-                  name="frameMode"
-                  checked={frameMode === 'wide'}
-                  onChange={() => saveFrameMode('wide')}
-                />
-                Frame: wide interior
-              </label>
-            </div>
+            
             <div className="row">
               <button onClick={generatePlate} disabled={plateBusy}>
                 {plateBusy
@@ -890,8 +882,17 @@ export default function App() {
         )}
       </section>
 
-      <section className="card">
-        <h2>Prompts (editable)</h2>
+      {promptsOpen && (
+        <div className="modal" onClick={() => setPromptsOpen(false)}>
+          <div className="modal-box modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Prompts (editable)</h2>
+              <button className="modal-close" onClick={() => setPromptsOpen(false)}>
+                ✕
+              </button>
+            </div>
+
+        
         <p className="hint">
           This exact text is sent to the model. Placeholders work inside templates:{' '}<code>{'{FINISH}'}</code> the selected finish block, <code>{'{VALVE}'}</code>{' '}the valve material, <code>{'{SECTIONS}'}</code> the section count,{' '}<code>{'{WIDTH_MM}'}</code> the width in mm. Changes save automatically in this browser.
         </p>
@@ -1096,7 +1097,10 @@ export default function App() {
         <div className="row">
           <button onClick={resetPrompts}>Restore defaults</button>
         </div>
-      </section>
+      
+          </div>
+        </div>
+      )}
 
       <section className="card">
         <h2>Step 3: Variant series</h2>
