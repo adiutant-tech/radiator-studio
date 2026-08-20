@@ -29,6 +29,15 @@ Bright, generous natural daylight floods in through the window, filling the room
 
 Shot on a full-frame camera with a 35 mm lens at f/5.6, camera at the height of the window sill, perfectly level, so all vertical lines stay vertical and there is no wide-angle distortion. Editorial interior photography in the style of World of Interiors: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
 
+
+// --- Plate z MINIATURY stylu (miniatura = obraz [1], v5.4) -------------------
+// Miniatura kafelka jest referencją generacji, żeby wynik odpowiadał temu,
+// co user widzi i wybiera. Fallback na tor tekstowy, gdy miniatury brak.
+
+export const PLATE_FROM_THUMB_PRODUCT = `Image [1] is the reference photograph of an interior. Recreate this exact interior as faithfully as possible: the same architecture, panelling, mouldings, window, curtains, wall colours, floor material, furnishings, camera position, framing and light. The result must read as the same room photographed moments later. Make only these adjustments: the stretch of wall beneath the window sill and the floor along it are completely empty and clean, with no radiator, no pipes, no pipe stubs, no fittings and no objects standing against that wall; and the scene is brightly, generously lit with an airy, high-key exposure. Everything is critically sharp, with fine material textures clearly resolved. The image contains no text, no lettering and no graphic overlays.`
+
+export const PLATE_FROM_THUMB_WIDE = `Image [1] is the style reference for an interior. Render the same room as a wider interior view: keep its architecture, panelling, mouldings, window design, curtains, wall colours, floor material, furnishings and mood exactly, and pull the camera back to show more of the room, shot with a 35 mm lens at the height of the window sill, perfectly level, with no wide-angle distortion. The wall directly beneath the window is completely empty and unobstructed, and the floor along it is completely clean and bare: no radiator, no pipes, no pipe stubs, no fittings and no objects standing against that wall. Bright, generous natural daylight, airy high-key exposure, open gentle shadows. Editorial interior photography: colour-accurate, natural contrast, no heavy grading. The image contains no text, no lettering and no graphic overlays.`
+
 // --- 10 stylów wnętrz (opis pokoju, edytowalny per styl) --------------------
 
 export const STYLES = [
@@ -129,7 +138,7 @@ export const FINISHES = [
   {
     key: 'matt-black',
     label: 'Matt Black',
-    block: `A dead flat matt black powder coat with zero gloss. The surface absorbs light completely, producing no specular highlights and no sheen anywhere on the casting. The form is legible only through soft tonal gradation across the curved columns and the darkness pooling in the ornamental relief. A neutral graphite black, neither blue-black nor brown-black.`,
+    block: `A dead flat matt black powder coat with zero gloss. The surface absorbs light completely, producing no specular highlights and no sheen anywhere on the casting. The form is legible only through soft tonal gradation across the curved columns and the darkness pooling in the recesses of the casting. A neutral graphite black, neither blue-black nor brown-black.`,
   },
   {
     key: 'gunmetal-grey',
@@ -139,17 +148,17 @@ export const FINISHES = [
   {
     key: 'satin-black',
     label: 'Satin Black',
-    block: `A soft-sheen black lacquer at roughly 30 percent gloss. Narrow, clean, elongated highlights run vertically down the front crest of every column, and the raised scrollwork catches thin bright edge-light along its topmost edges. Deep black in shadow, silky and gently reflective in the light. It is not glossy and it shows no mirror reflections of the room.`,
+    block: `A soft-sheen black lacquer at roughly 30 percent gloss. Narrow, clean, elongated highlights run vertically down the front crest of every column, and any raised detail of the casting catches thin bright edge-light along its topmost edges. Deep black in shadow, silky and gently reflective in the light. It is not glossy and it shows no mirror reflections of the room.`,
   },
   {
     key: 'antique-bronze',
     label: 'Antique Bronze',
-    block: `A hand-highlighted antique bronze patina. A dark chocolate-brown metallic base coat, with warm burnished gold and copper highlight rubbed by hand onto every raised edge: the crest of each column, the top and bottom collars, the full length of the ornamental scrollwork, and the curved feet. The recesses, the ground of the ornament and the gaps between the columns stay deep and dark brown. The contrast between the bright rubbed edges and the dark recesses is the entire character of this finish and must be strong, so the ornament reads sculpturally. Rich, aged, warm and luminous where the daylight strikes it. It is never a uniform flat brown.`,
+    block: `A hand-highlighted antique bronze patina. A dark chocolate-brown metallic base coat, with warm burnished gold and copper highlight rubbed by hand onto every raised edge of the casting: the crest of each column, the top and bottom collars, any raised detail the casting carries, and the feet. The recesses and the gaps between the columns stay deep and dark brown. The contrast between the bright rubbed edges and the dark recesses is the entire character of this finish and must be strong, so the relief of the casting reads sculpturally. Rich, aged, warm and luminous where the daylight strikes it. It is never a uniform flat brown.`,
   },
   {
     key: 'cream-white',
     label: 'Cream White',
-    block: `A warm off-white eggshell paint with a soft low sheen, in the register of old lime plaster and aged French painted furniture. Faintly creamy and yellow-warm rather than cold, blue or brilliant white. Gentle grey-lilac shadows settle into the ornamental relief and between the columns, keeping every piece of casting detail legible against the wall behind it. A painted-furniture look, calm and understated.`,
+    block: `A warm off-white eggshell paint with a soft low sheen, in the register of old lime plaster and aged French painted furniture. Faintly creamy and yellow-warm rather than cold, blue or brilliant white. Gentle grey-lilac shadows settle into the recesses of the casting and between the columns, keeping every piece of casting detail legible against the wall behind it. A painted-furniture look, calm and understated.`,
   },
   {
     key: 'base-coat',
@@ -171,7 +180,9 @@ export const SECTION_VARIANTS = [
 
 // --- Wspólne fragmenty szablonów kompozycji ----------------------------------
 
-const PRODUCT_PARA = `Image [2] is the single source of truth for the radiator's design AND its proportions. Copy it one to one: the silhouette, the real height-to-width proportions of a single section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the shape of the decorative feet, and the round valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the same sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it. The ONLY permitted deviation from image [2] is the number of sections: build the radiator with exactly {SECTIONS} evenly spaced identical sections, approximately {WIDTH_MM} mm wide in total, while each individual section stays exactly as in image [2]. It is a sectional cast iron column radiator, exactly two columns deep, with a slim front-to-back profile.`
+const PRODUCT_PARA = `THE RADIATOR HAS EXACTLY {SECTIONS} ({SECTIONS_WORD}) SECTIONS. {SECTIONS_ENUM} The section count comes ONLY from this instruction. Image [2] may show a radiator with a different number of sections; its count carries no weight at all, only its design does.
+
+For everything else, image [2] is the single source of truth for the radiator's design AND its proportions. Copy one to one: the silhouette, the real height-to-width proportions of a SINGLE section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the shape of its feet, and the valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the corresponding sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it. Build the radiator by repeating the single-section design from image [2] exactly {SECTIONS} times, evenly spaced, approximately {WIDTH_MM} mm wide in total. It is a sectional cast iron column radiator; the number of columns in depth, and the front-to-back profile, follow image [2] exactly.`
 
 // --- Bloki zaworów: wybierane AUTOMATYCZNIE przez appkę --------------------
 // generic: brak zdjęcia zaworu; refSingle: zdjęcie z jednym zaworem;
@@ -185,7 +196,7 @@ export const VALVES_REF_SINGLE = `There are exactly two valves, one at each bott
 export const VALVES_REF_PAIR = `There are exactly two valves, one at each bottom outer corner of the radiator, never one and never more than two. Image [3] shows both of them, and the two valves are DIFFERENT from each other by design: the LEFT corner has the control valve with the round handwheel from image [3], and the RIGHT corner has the plain lockshield valve from image [3]; this pairing stays the same in every image. Copy each valve's design from image [3] one to one, its body shape, spindle and fittings. Each valve stands on its own pipe coming vertically out of the floor and joins the radiator at the bottom of its end section; both are fully connected, nothing floats loose in the room. Both valves and their visible pipework are made of {VALVE}; relative to image [3], change only the metal finish. The valve metal contrasts cleanly with the radiator body. Image [3] shows the valves as loose, uninstalled product photos; in the scene each valve is INSTALLED in its working position: rotated so its union is fully threaded into the radiator's bottom side connection, with no open threads and no unconnected outlets visible anywhere, the pipe running from the valve straight down into the floor, and the handwheel or cap pointing upright. Keep realistic plumbing scale: a valve is small next to the radiator, roughly the height of the radiator's bottom collar.`
 
 
-const LIGHT_PARA = `Integrate the radiator into the photograph seamlessly. Follow the direction and character of the daylight already present in image [1], and keep the scene bright, airy and generously lit, with open, luminous shadows rather than heavy darkness. The light rakes across the front of the radiator at a low angle and catches every raised detail of the casting, so the ornamental scrollwork on each section reads crisply and sculpturally, never sinking into shadow; there is full visible detail even in the darkest areas of the radiator. Cast a soft shadow along the floor consistent with the room's light, and a tight contact shadow under each of the four feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the floor onto the lower edges of the casting. Match the grain, colour temperature and depth of field of image [1] so the radiator reads as if it had been in the original photograph all along.`
+const LIGHT_PARA = `Integrate the radiator into the photograph seamlessly. Follow the direction and character of the daylight already present in image [1], and keep the scene bright, airy and generously lit, with open, luminous shadows rather than heavy darkness. The light rakes across the front of the radiator at a low angle and catches every raised detail of the casting, so every raised detail of the casting reads crisply and sculpturally, never sinking into shadow; there is full visible detail even in the darkest areas of the radiator. Cast a soft shadow along the floor consistent with the room's light, and a tight contact shadow under each of its feet, with a visible gap of light beneath the body of the radiator. Add a faint warm bounce from the floor onto the lower edges of the casting. Match the grain, colour temperature and depth of field of image [1] so the radiator reads as if it had been in the original photograph all along.`
 
 // --- KROK 2a: kompozycja dla WNĘTRZA GENEROWANEGO (plate ze stylu) ----------
 // Plate ze szkieletu zawsze ma okno, pustą ścianę i rurki, więc szablon może
@@ -225,8 +236,8 @@ The finish of the radiator body: {FINISH}`
 // --- Dopiski kadru do szablonu kompozycji ({FRAMING}) ------------------------
 
 export const FRAMING = {
-  product: `The radiator is the hero of the photograph and fills the frame almost edge to edge beneath the sill, so close that the image reads like a product detail shot: the cast-iron surface texture, the crispness of the casting edges and the full depth of the ornamental relief are rendered at near-macro detail on every visible section. If the radiator is wider than the frame, its outer sections are simply cropped by the frame edges; never zoom out to fit it in.`,
-  wide: `The radiator sits naturally in the scene beneath the window, clearly visible and well lit, its texture and ornament legible, while the room around it remains an important part of the composition.`,
+  product: `The radiator is the hero of the photograph and fills the frame almost edge to edge beneath the sill, so close that the image reads like a product detail shot: the cast-iron surface texture, the crispness of the casting edges and every raised or recessed detail of the casting are rendered at near-macro detail on every visible section. If the radiator is wider than the frame, its outer sections are simply cropped by the frame edges; never zoom out to fit it in.`,
+  wide: `The radiator sits naturally in the scene beneath the window, clearly visible and well lit, its texture and casting detail legible, while the room around it remains an important part of the composition.`,
 }
 
 // --- KROK 3a: swap finiszu (z kadru master) ----------------------------------
@@ -237,7 +248,7 @@ export const FINISH_SWAP_TEMPLATE = `Keep everything in this image absolutely id
 
 // Nota o parze zaworów, wstrzykiwana do KAŻDEGO kroku serii w trybie "pair",
 // żeby edycje nie "naprawiały" celowej asymetrii do symetrii.
-export const PAIR_NOTE = `The radiator's two valves are intentionally DIFFERENT from each other: the control valve with the round handwheel is on the left, and the plain lockshield valve is on the right. Keep each valve exactly as it is, on its own side. Do not make the two valves match.`
+export const PAIR_NOTE = `The radiator's two valves are intentionally DIFFERENT from each other: the valve with the handwheel is on the left, and the plain lockshield valve is on the right. Keep each valve exactly as it is, on its own side. Do not make the two valves match.`
 
 // --- KROK 3b: swap przyłączy (z gotowego kadru) -------------------------------
 

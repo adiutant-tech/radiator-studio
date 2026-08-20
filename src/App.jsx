@@ -3,6 +3,8 @@ import JSZip from 'jszip'
 import {
   PLATE_SCAFFOLD_PRODUCT,
   PLATE_SCAFFOLD_WIDE,
+  PLATE_FROM_THUMB_PRODUCT,
+  PLATE_FROM_THUMB_WIDE,
   FRAMING,
   STYLES,
   FINISHES,
@@ -135,10 +137,17 @@ async function toJpeg(dataUrl, quality = 0.95) {
   return canvas.toDataURL('image/jpeg', quality)
 }
 
+
+// Liczenie to najsłabszy punkt modeli obrazkowych: cyfra + słowo + wyliczanka
+// sekcja po sekcji dają najwyższą zgodność liczby sekcji.
+const SECTION_WORDS = { 4: 'four', 6: 'six', 8: 'eight', 10: 'ten', 12: 'twelve', 14: 'fourteen' }
+const sectionsEnum = (n) =>
+  `Counting from the left, the sections are: ${Array.from({ length: n }, (_, i) => `section ${i + 1}`).join(', ')}. After section ${n} the radiator ends with its end column and its foot; the total is exactly ${n} sections.`
+
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.2'
+const APP_VERSION = 'v5.6'
 
 // Miniatura stylu: public/styles/{key}.jpg (brak pliku = kafelek bez zdjęcia)
 const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
@@ -149,7 +158,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v18'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v22'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -158,6 +167,8 @@ function defaultPrompts() {
   return {
     plateScaffoldProduct: PLATE_SCAFFOLD_PRODUCT,
     plateScaffoldWide: PLATE_SCAFFOLD_WIDE,
+    plateFromThumbProduct: PLATE_FROM_THUMB_PRODUCT,
+    plateFromThumbWide: PLATE_FROM_THUMB_WIDE,
     framingProduct: FRAMING.product,
     framingWide: FRAMING.wide,
     styles: Object.fromEntries(STYLES.map((s) => [s.key, s.prompt])),
@@ -186,6 +197,8 @@ function loadPrompts() {
     return {
       plateScaffoldProduct: saved.plateScaffoldProduct ?? d.plateScaffoldProduct,
       plateScaffoldWide: saved.plateScaffoldWide ?? d.plateScaffoldWide,
+      plateFromThumbProduct: saved.plateFromThumbProduct ?? d.plateFromThumbProduct,
+      plateFromThumbWide: saved.plateFromThumbWide ?? d.plateFromThumbWide,
       framingProduct: saved.framingProduct ?? d.framingProduct,
       framingWide: saved.framingWide ?? d.framingWide,
       styles: { ...d.styles, ...(saved.styles || {}) },
@@ -324,6 +337,8 @@ export default function App() {
       .replaceAll('{FINISH}', prompts.finishes[finishKey])
       .replaceAll('{VALVE}', prompts.valves[valveKey])
       .replaceAll('{SECTIONS}', String(sectionVariant.sections))
+      .replaceAll('{SECTIONS_WORD}', SECTION_WORDS[sectionVariant.sections] || String(sectionVariant.sections))
+      .replaceAll('{SECTIONS_ENUM}', sectionsEnum(sectionVariant.sections))
       .replaceAll('{WIDTH_MM}', String(sectionVariant.width))
       .replaceAll(
         '{FRAMING}',
@@ -381,13 +396,42 @@ export default function App() {
 
   // --- plate ---------------------------------------------------------------
 
+  // Miniatura stylu jako dataURL (null, gdy pliku brak)
+  const loadStyleThumb = async (key) => {
+    try {
+      const res = await fetch(styleThumb(key))
+      if (!res.ok) return null
+      const blob = await res.blob()
+      const raw = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = () => resolve(r.result)
+        r.onerror = reject
+        r.readAsDataURL(blob)
+      })
+      return await recompress(raw)
+    } catch {
+      return null
+    }
+  }
+
   const generatePlate = async () => {
     setPlateBusy(true)
     try {
-      const scaffold =
-        frameMode === 'wide' ? prompts.plateScaffoldWide : prompts.plateScaffoldProduct
-      const stylePrompt = `${prompts.styles[styleKey]}\n\n${scaffold}`
-      const raw = await generateImage(stylePrompt, [])
+      // Tor główny: MINIATURA stylu jako obraz [1], wynik ma odpowiadać
+      // temu, co user widzi na kafelku. Fallback: stary tor tekstowy.
+      const thumb = await loadStyleThumb(styleKey)
+      let raw
+      if (thumb) {
+        const prompt =
+          frameMode === 'wide'
+            ? prompts.plateFromThumbWide
+            : prompts.plateFromThumbProduct
+        raw = await generateImage(prompt, [thumb])
+      } else {
+        const scaffold =
+          frameMode === 'wide' ? prompts.plateScaffoldWide : prompts.plateScaffoldProduct
+        raw = await generateImage(`${prompts.styles[styleKey]}\n\n${scaffold}`, [])
+      }
       setPlate(await recompress(raw))
       setPlateOrigin('style')
       setPlateFrame(frameMode)
@@ -878,7 +922,25 @@ export default function App() {
         </details>
 
         <details>
-          <summary>Interior scaffold: product close-up frame</summary>
+          <summary>Plate from style thumbnail: product frame (thumbnail = image [1])</summary>
+          <textarea
+            rows={7}
+            value={prompts.plateFromThumbProduct}
+            onChange={(e) => setPrompt({ plateFromThumbProduct: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Plate from style thumbnail: wide frame (thumbnail = image [1])</summary>
+          <textarea
+            rows={7}
+            value={prompts.plateFromThumbWide}
+            onChange={(e) => setPrompt({ plateFromThumbWide: e.target.value })}
+          />
+        </details>
+
+        <details>
+          <summary>Interior scaffold: product close-up frame (fallback, no thumbnail)</summary>
           <textarea
             rows={8}
             value={prompts.plateScaffoldProduct}
@@ -1052,7 +1114,7 @@ export default function App() {
               ))}
             </select>
             <p className="hint">
-              Enters the prompt as {'{SECTIONS}'} and {'{WIDTH_MM}'}. The whole series is generated in a single width variant.
+              The selector is AUTHORITATIVE: the model builds exactly this many sections regardless of how many the packshot shows; the packshot defines only the design. Counts far from the packshot may need a retry or two.
             </p>
           </div>
           <div>
@@ -1185,7 +1247,7 @@ export default function App() {
 
       <footer>
         <p>
-          QA before sending to the client: count the sections against the packshot, check the two-column depth, the ornament on every section, both valves connected, and the shadow direction consistent with the window light.
+          QA before sending to the client: count the sections against the packshot, check that column depth, feet and surface decoration match the packshot (plain stays plain), both valves installed and connected, and the shadow direction consistent with the room light.
         </p>
       </footer>
     </div>
