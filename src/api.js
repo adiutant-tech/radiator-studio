@@ -143,7 +143,67 @@ async function geminiGenerate(prompt, imageDataUrls) {
 // blokuje generacji - kadr jest wtedy przyjmowany bez weryfikacji.
 // QA zawsze idzie przez Gemini, także przy silniku OpenAI (proxy przepuszcza
 // tylko /v1/images/*, a klucz Gemini i tak jest w Ustawieniach).
-export const VERIFY_MODEL = 'gemini-2.5-flash'
+//
+// LEKCJA v5.11: sztywna nazwa modelu tekstowego ('gemini-2.5-flash') zaczęła
+// zwracać 404, gdy Google wycofał ten identyfikator, i QA milczało po cichu.
+// Teraz nazwa jest wykrywana automatycznie z listy modeli konta (ListModels),
+// cache'owana w localStorage i odświeżana, gdy znów pojawi się 404.
+// Pole "QA model" w Ustawieniach pozwala ją nadpisać ręcznie ('' = auto).
+const QA_MODEL_LS = 'radiator-studio-qa-model'
+const QA_MODEL_CACHE_LS = 'radiator-studio-qa-model-resolved'
+
+export const getQaModelOverride = () => localStorage.getItem(QA_MODEL_LS) || ''
+export const setQaModelOverride = (m) => {
+  localStorage.setItem(QA_MODEL_LS, m.trim())
+  // ręczna zmiana unieważnia auto-wykrycie, żeby nie maskowało nowego wpisu
+  localStorage.removeItem(QA_MODEL_CACHE_LS)
+}
+export const getQaModelResolved = () =>
+  getQaModelOverride() || localStorage.getItem(QA_MODEL_CACHE_LS) || ''
+
+// Pyta API o listę modeli i wybiera tekstowy "flash": bez wariantów obrazowych,
+// audio, wideo i embeddingów. Preferuje aliasy "latest", potem najwyższą wersję.
+async function discoverVerifyModel(key) {
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',
+      { headers: { 'x-goog-api-key': key } },
+    )
+    const body = await res.json().catch(() => null)
+    if (!res.ok || !Array.isArray(body?.models)) return null
+    const names = body.models
+      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m) => String(m.name || '').replace(/^models\//, ''))
+      .filter(
+        (n) =>
+          /flash/i.test(n) &&
+          !/image|imagen|tts|live|audio|embed|veo|thinking|exp\b/i.test(n),
+      )
+    if (!names.length) return null
+    names.sort((a, b) => {
+      const la = /latest/.test(a) ? 0 : 1
+      const lb = /latest/.test(b) ? 0 : 1
+      if (la !== lb) return la - lb
+      const va = parseFloat((a.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0')
+      const vb = parseFloat((b.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0')
+      if (va !== vb) return vb - va
+      return a.length - b.length
+    })
+    return names[0]
+  } catch {
+    return null
+  }
+}
+
+async function resolveVerifyModel(key) {
+  const manual = getQaModelOverride()
+  if (manual) return manual
+  const cached = localStorage.getItem(QA_MODEL_CACHE_LS)
+  if (cached) return cached
+  const found = await discoverVerifyModel(key)
+  if (found) localStorage.setItem(QA_MODEL_CACHE_LS, found)
+  return found
+}
 
 export async function verifyJson(prompt, imageDataUrls = []) {
   const key = getApiKey()
@@ -163,14 +223,27 @@ export async function verifyJson(prompt, imageDataUrls = []) {
       ],
       generationConfig: { responseMimeType: 'application/json' },
     })
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${VERIFY_MODEL}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: payload,
-      },
-    )
+    const call = (model) =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body: payload,
+        },
+      )
+
+    let model = await resolveVerifyModel(key)
+    if (!model) return null
+    let res = await call(model)
+    if (res.status === 404) {
+      // nazwa wygasła po stronie Google: wymuś świeże wykrycie i jedna ponowna próba
+      localStorage.removeItem(QA_MODEL_CACHE_LS)
+      const fresh = await discoverVerifyModel(key)
+      if (!fresh || fresh === model) return null
+      localStorage.setItem(QA_MODEL_CACHE_LS, fresh)
+      res = await call(fresh)
+    }
     const body = await res.json().catch(() => null)
     if (!res.ok || !body) return null
     const text = (body?.candidates?.[0]?.content?.parts || [])

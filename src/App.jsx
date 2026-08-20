@@ -40,6 +40,9 @@ import {
   getOpenaiProxy,
   setOpenaiProxy,
   DEFAULT_OPENAI_MODEL,
+  getQaModelOverride,
+  setQaModelOverride,
+  getQaModelResolved,
 } from './api.js'
 
 // ---------------------------------------------------------------------------
@@ -156,7 +159,7 @@ const sectionsEnum = (n) =>
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.10'
+const APP_VERSION = 'v5.11'
 
 // Auto-QA: maksymalna liczba prób generacji jednego kadru (1 + ponowienia)
 const QA_MAX_ATTEMPTS = 3
@@ -240,6 +243,7 @@ function loadPrompts() {
 export default function App() {
   const [apiKey, setApiKeyState] = useState(getApiKey())
   const [modelId, setModelIdState] = useState(getModel())
+  const [qaModel, setQaModelState] = useState(getQaModelOverride())
   const [engine, setEngineState] = useState(getEngine())
   const [openaiKey, setOpenaiKeyState] = useState(getOpenaiKey())
   const [openaiModel, setOpenaiModelState] = useState(getOpenaiModel())
@@ -748,6 +752,25 @@ export default function App() {
             </label>
             <p className="hint">
               The default {DEFAULT_MODEL} outputs ~1 MP. If you have access to a Pro variant (2K/4K), enter its model ID here.
+            </p>
+            <label>
+              QA model (text, for Auto-QA checks)
+              <input
+                type="text"
+                placeholder={
+                  getQaModelResolved()
+                    ? `auto: ${getQaModelResolved()}`
+                    : 'auto-detected from your account'
+                }
+                value={qaModel}
+                onChange={(e) => {
+                  setQaModelState(e.target.value)
+                  setQaModelOverride(e.target.value)
+                }}
+              />
+            </label>
+            <p className="hint">
+              Leave empty for auto-detection: the app asks the API for the model list and picks a current text "flash" model. Fill in only to force a specific one.
             </p>
           </>
         )}
