@@ -183,6 +183,8 @@ button.primary { background: var(--accent); color: var(--accent-ink); border-col
 }
 .modal-close:hover { color: var(--ink); border: none; }
 .modal-box label { margin-top: 12px; }
+.modal-actions { margin-top: 20px; align-items: center; }
+.modal-actions-hint { margin: 0; font-size: 12px; }
 
 .style-grid {
   display: grid;

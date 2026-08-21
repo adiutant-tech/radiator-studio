@@ -158,8 +158,21 @@ const sectionsEnum = (n) =>
 
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
+// Czyści nazwę pliku na bezpieczny człon nazwy wynikowej: bez rozszerzenia,
+// bez znaków diakrytycznych, spacje i znaki specjalne na myślniki.
+const slugify = (s) =>
+  String(s || '')
+    .replace(/\.[^.]+$/, '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[łŁ]/g, 'l')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 40)
+
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v6.2'
+const APP_VERSION = 'v6.5'
 
 // Auto-QA: maksymalna liczba prób generacji jednego kadru (1 + ponowienia)
 const QA_MAX_ATTEMPTS = 3
@@ -174,7 +187,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v26'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v27'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -305,6 +318,11 @@ export default function App() {
     setMasterMeta(null)
   }
 
+  // Nazwy do plików wynikowych (v6.4): baza nazwy packshotu + wnętrze.
+  // Wnętrze = klucz stylu (tor styled) albo baza nazwy własnego zdjęcia.
+  const [packshotName, setPackshotName] = useState('')
+  const [roomName, setRoomName] = useState('')
+
   // Esc zamyka okna modalne
   useEffect(() => {
     if (!settingsOpen && !promptsOpen) return
@@ -380,13 +398,13 @@ export default function App() {
   const buildSwapPrompt = (valveKey) =>
     prompts.swap
       .replaceAll('{VALVE}', prompts.valves[valveKey])
+      // v6.5: swap zaworów bez zdjęcia referencyjnego; nota każe zachować
+      // design z bieżącego kadru i zmienić wyłącznie metal.
       .replaceAll(
         '{VALVE_REF}',
-        !valveRef
-          ? ''
-          : valveRefMode === 'pair'
-            ? prompts.swapRefPair
-            : prompts.swapRefSingle,
+        valveRef && valveRefMode === 'pair'
+          ? prompts.swapRefPair
+          : prompts.swapRefSingle,
       )
 
   const buildFinishSwapPrompt = (finishKey) =>
@@ -556,6 +574,7 @@ export default function App() {
           )
       setPlate(await recompress(raw))
       setPlateOrigin('style')
+      setRoomName(styleKey)
       clearMaster()
     } catch (e) {
       alert(`Interior generation failed: ${e.message}`)
@@ -634,7 +653,9 @@ export default function App() {
     cancelRef.current = false
     setRunning(true)
 
-    const valveSmall = valveRef ? (await fitBudget([valveRef]))[0] : null
+    // v6.5: swapy zaworów NIE dostają zdjęcia referencyjnego zaworu. Design
+    // jest już w kadrze bazowym; referencja w innym metalu (np. mosiężna)
+    // re-forsowała swój materiał i wszystkie warianty wychodziły mosiężne.
     const masterId = cellId(masterMeta.finishKey, masterMeta.valveKey)
 
     setCells((prev) => {
@@ -690,11 +711,9 @@ export default function App() {
         const swapPrompt = buildSwapPrompt(v)
         patchCell(vId, { status: 'running', prompt: swapPrompt, sections, qa: null, verify: null })
         try {
-          const res = await generateVerified(
-            swapPrompt,
-            valveSmall ? [baseImg, valveSmall] : [baseImg],
-            { noteCellId: vId },
-          )
+          const res = await generateVerified(swapPrompt, [baseImg], {
+            noteCellId: vId,
+          })
           patchCell(vId, { status: 'done', img: res.img, verify: res.verify, qa: null })
         } catch (e) {
           patchCell(vId, { status: 'error', error: e.message })
@@ -741,12 +760,19 @@ export default function App() {
     }
   }
 
+  // Nazwa pliku wynikowego (v6.4): {packshot}_{finisz__zawor}_{wnetrze}.jpg,
+  // gdzie wnętrze to klucz stylu albo baza nazwy własnego zdjęcia pokoju.
+  const frameFile = (id) =>
+    `${packshotName || 'radiator'}_${id}_${
+      roomName || (plateOrigin === 'style' ? styleKey : 'interior')
+    }.jpg`
+
   const downloadAll = async () => {
     const zip = new JSZip()
     for (const [id, cell] of Object.entries(cells)) {
       if (cell.status !== 'done') continue
       const jpeg = await toJpeg(cell.img)
-      zip.file(`radiator_${cell.sections || sections}sections_${id}.jpg`, jpeg.split(',')[1], {
+      zip.file(frameFile(id), jpeg.split(',')[1], {
         base64: true,
       })
     }
@@ -900,6 +926,15 @@ export default function App() {
             </p>
           </>
         )}
+
+        <div className="row modal-actions">
+          <button className="primary" onClick={() => setSettingsOpen(false)}>
+            Save &amp; close
+          </button>
+          <p className="hint modal-actions-hint">
+            Changes are saved in this browser as you type; this button confirms and closes.
+          </p>
+        </div>
           </div>
         </div>
       )}
@@ -918,6 +953,7 @@ export default function App() {
               hidden
               onChange={async (e) => {
                 if (!e.target.files[0]) return
+                setPackshotName(slugify(e.target.files[0].name))
                 setPackshot(await fileToDataUrl(e.target.files[0]))
                 clearMaster()
               }}
@@ -927,6 +963,7 @@ export default function App() {
             <button
               onClick={() => {
                 setPackshot(null)
+                setPackshotName('')
                 clearMaster()
               }}
             >
@@ -1068,6 +1105,7 @@ export default function App() {
                 hidden
                 onChange={async (e) => {
                   if (!e.target.files[0]) return
+                  setRoomName(slugify(e.target.files[0].name))
                   setPlate(await fileToDataUrl(e.target.files[0]))
                   setPlateOrigin('own')
                   clearMaster()
@@ -1311,8 +1349,14 @@ export default function App() {
           </label>
         </details>
 
-        <div className="row">
+        <div className="row modal-actions">
+          <button className="primary" onClick={() => setPromptsOpen(false)}>
+            Save &amp; close
+          </button>
           <button onClick={resetPrompts}>Restore defaults</button>
+          <p className="hint modal-actions-hint">
+            Edits are saved in this browser as you type; this button confirms and closes.
+          </p>
         </div>
 
           </div>
@@ -1466,7 +1510,7 @@ export default function App() {
                           onClick={async () =>
                             download(
                               await toJpeg(cell.img),
-                              `radiator_${cell.sections || sections}sections_${id}.jpg`,
+                              frameFile(id),
                             )
                           }
                         >
