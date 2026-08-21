@@ -159,7 +159,7 @@ const sectionsEnum = (n) =>
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v6.0'
+const APP_VERSION = 'v6.2'
 
 // Auto-QA: maksymalna liczba prób generacji jednego kadru (1 + ponowienia)
 const QA_MAX_ATTEMPTS = 3
@@ -294,6 +294,17 @@ export default function App() {
   const [promptsOpen, setPromptsOpen] = useState(false)
   const cancelRef = useRef(false)
 
+  // Kadr MASTER z bramką akceptacji (v6.1): seria nie rusza automatycznie.
+  // Krok 1 generuje wyłącznie master; user go ocenia (badge QA, podgląd,
+  // Retry); krok 2 dopiero na jego podstawie robi pozostałe warianty.
+  // Zmiana packshotu lub wnętrza unieważnia master.
+  const [masterImg, setMasterImg] = useState(null)
+  const [masterMeta, setMasterMeta] = useState(null) // {finishKey, valveKey}
+  const clearMaster = () => {
+    setMasterImg(null)
+    setMasterMeta(null)
+  }
+
   // Esc zamyka okna modalne
   useEffect(() => {
     if (!settingsOpen && !promptsOpen) return
@@ -426,6 +437,12 @@ export default function App() {
     let best = null
     let addendum = ''
     for (let attempt = 1; attempt <= QA_MAX_ATTEMPTS; attempt++) {
+      // Stop przerywa też pętlę QA: zwróć najlepszy dotychczasowy kadr,
+      // a jeśli żadnego jeszcze nie ma, przerwij całkowicie.
+      if (cancelRef.current) {
+        if (best) return best
+        throw new Error('Stopped.')
+      }
       const img = await generateImage(
         addendum ? `${basePrompt}\n\n${addendum}` : basePrompt,
         inputs,
@@ -539,6 +556,7 @@ export default function App() {
           )
       setPlate(await recompress(raw))
       setPlateOrigin('style')
+      clearMaster()
     } catch (e) {
       alert(`Interior generation failed: ${e.message}`)
     } finally {
@@ -557,15 +575,25 @@ export default function App() {
 
   const totalCells = plan.reduce((n, p) => n + p.valveOrder.length, 0)
 
-  const runSeries = async () => {
+  // KROK 1: sam MASTER. Pierwszy wybrany finisz × pierwszy wybrany wariant
+  // przyłączy, jedyna pełna kompozycja packshot+wnętrze w serii. User ocenia
+  // wynik (badge QA, podgląd, Retry) i dopiero potem odpala warianty.
+  const runMaster = async () => {
     if (!packshot || !plate) {
       alert('A packshot and a reference interior are required.')
       return
     }
+    if (plan.length === 0 || plan[0].valveOrder.length === 0) {
+      alert('Select at least one finish and one valve variant.')
+      return
+    }
     cancelRef.current = false
     setRunning(true)
+    const finishKey = plan[0].finishKey
+    const valveKey = plan[0].valveOrder[0]
+    const id = cellId(finishKey, valveKey)
+    const prompt = buildComposePrompt(finishKey, valveKey)
 
-    // budżet bajtowy na wejścia łącznie
     // KOLEJNOŚĆ MA ZNACZENIE: [1] = pokój (baza edycji), [2] = packshot,
     // [3] = opcjonalna referencja zaworu
     const inputsAll = await fitBudget(
@@ -573,72 +601,103 @@ export default function App() {
     )
     const [plateSmall, packshotSmall, valveSmall] = inputsAll
 
-    const init = {}
-    for (const p of plan)
-      for (const v of p.valveOrder)
-        init[cellId(p.finishKey, v)] = { status: 'pending' }
-    setCells(init)
+    setCells({ [id]: { status: 'running', prompt, sections, qa: null, verify: null } })
+    clearMaster()
+    try {
+      // Master jest sprawdzany przez QA także pod kątem zgodności WZORU
+      // z packshotem; warianty dziedziczą wzór z mastera.
+      const res = await generateVerified(
+        prompt,
+        valveSmall
+          ? [plateSmall, packshotSmall, valveSmall]
+          : [plateSmall, packshotSmall],
+        { checkDesign: packshotSmall, noteCellId: id },
+      )
+      patchCell(id, { status: 'done', img: res.img, verify: res.verify, qa: null })
+      const [fitted] = await fitBudget([res.img])
+      setMasterImg(fitted)
+      setMasterMeta({ finishKey, valveKey })
+    } catch (e) {
+      patchCell(id, { status: 'error', error: e.message })
+    }
+    setRunning(false)
+  }
 
-    // KADR MASTER: pierwszy finisz to jedyna pełna kompozycja w serii.
-    // Każdy kolejny finisz powstaje jako edycja mastera (zmiana samego
-    // lakieru), dzięki czemu cała seria dzieli identyczny kadr, kąt i światło.
-    let masterFrame = null
+  // KROK 2: WARIANTY z zaakceptowanego mastera. Finisze jako swap lakieru
+  // z mastera, przyłącza jako swap zaworów z kadru danego finiszu. Master
+  // nie jest generowany ponownie; jego komórka zostaje nietknięta.
+  const runVariants = async () => {
+    if (!masterImg || !masterMeta) {
+      alert('Generate the master frame first (step 1).')
+      return
+    }
+    cancelRef.current = false
+    setRunning(true)
+
+    const valveSmall = valveRef ? (await fitBudget([valveRef]))[0] : null
+    const masterId = cellId(masterMeta.finishKey, masterMeta.valveKey)
+
+    setCells((prev) => {
+      const init = {}
+      for (const p of plan)
+        for (const v of p.valveOrder) {
+          const id = cellId(p.finishKey, v)
+          init[id] =
+            id === masterId && prev[id]?.status === 'done'
+              ? prev[id]
+              : { status: 'pending' }
+        }
+      return init
+    })
 
     for (const p of plan) {
       if (cancelRef.current) break
-      const [firstValve, ...restValves] = p.valveOrder
-      let frameImg = null
 
-      const firstId = cellId(p.finishKey, firstValve)
-      const isMaster = !masterFrame
-      const firstPrompt = isMaster
-        ? buildComposePrompt(p.finishKey, firstValve)
-        : buildFinishSwapPrompt(p.finishKey)
-      const inputs = isMaster
-        ? valveSmall
-          ? [plateSmall, packshotSmall, valveSmall]
-          : [plateSmall, packshotSmall]
-        : [masterFrame]
-
-      patchCell(firstId, { status: 'running', prompt: firstPrompt, sections, qa: null, verify: null })
-      try {
-        // QA: master jest sprawdzany także pod kątem zgodności WZORU
-        // z packshotem; kolejne finisze dziedziczą wzór z mastera, więc
-        // dla nich wystarczy sama liczba sekcji.
-        const res = await generateVerified(firstPrompt, inputs, {
-          checkDesign: isMaster ? packshotSmall : null,
-          noteCellId: firstId,
-        })
-        frameImg = res.img
-        patchCell(firstId, { status: 'done', img: frameImg, verify: res.verify, qa: null })
-        // kadr posłuży jako wejście kolejnych edycji: zmieść w budżecie
-        ;[frameImg] = await fitBudget([frameImg])
-        if (isMaster) masterFrame = frameImg
-      } catch (e) {
-        patchCell(firstId, { status: 'error', error: e.message })
-        for (const rv of restValves)
-          patchCell(cellId(p.finishKey, rv), {
-            status: 'error',
-            error: 'Skipped: no base frame for this finish.',
+      // baza dla finiszu: master albo swap lakieru z mastera (z zaworem mastera)
+      let baseImg
+      if (p.finishKey === masterMeta.finishKey) {
+        baseImg = masterImg
+      } else {
+        const baseId = cellId(p.finishKey, masterMeta.valveKey)
+        const tracked = p.valveOrder.includes(masterMeta.valveKey)
+        const swapPrompt = buildFinishSwapPrompt(p.finishKey)
+        if (tracked)
+          patchCell(baseId, { status: 'running', prompt: swapPrompt, sections, qa: null, verify: null })
+        try {
+          const res = await generateVerified(swapPrompt, [masterImg], {
+            noteCellId: tracked ? baseId : null,
           })
-        continue
+          if (tracked)
+            patchCell(baseId, { status: 'done', img: res.img, verify: res.verify, qa: null })
+          ;[baseImg] = await fitBudget([res.img])
+        } catch (e) {
+          if (tracked) patchCell(baseId, { status: 'error', error: e.message })
+          for (const v of p.valveOrder)
+            if (v !== masterMeta.valveKey)
+              patchCell(cellId(p.finishKey, v), {
+                status: 'error',
+                error: 'Skipped: no base frame for this finish.',
+              })
+          continue
+        }
       }
 
       // pozostałe warianty przyłączy: swap zaworów z kadru tego finiszu
-      for (const rv of restValves) {
+      for (const v of p.valveOrder) {
+        if (v === masterMeta.valveKey) continue
         if (cancelRef.current) break
-        const rvId = cellId(p.finishKey, rv)
-        const swapPrompt = buildSwapPrompt(rv)
-        patchCell(rvId, { status: 'running', prompt: swapPrompt, sections, qa: null, verify: null })
+        const vId = cellId(p.finishKey, v)
+        const swapPrompt = buildSwapPrompt(v)
+        patchCell(vId, { status: 'running', prompt: swapPrompt, sections, qa: null, verify: null })
         try {
           const res = await generateVerified(
             swapPrompt,
-            valveSmall ? [frameImg, valveSmall] : [frameImg],
-            { noteCellId: rvId },
+            valveSmall ? [baseImg, valveSmall] : [baseImg],
+            { noteCellId: vId },
           )
-          patchCell(rvId, { status: 'done', img: res.img, verify: res.verify, qa: null })
+          patchCell(vId, { status: 'done', img: res.img, verify: res.verify, qa: null })
         } catch (e) {
-          patchCell(rvId, { status: 'error', error: e.message })
+          patchCell(vId, { status: 'error', error: e.message })
         }
       }
     }
@@ -652,6 +711,10 @@ export default function App() {
       alert('A packshot and a reference interior are required.')
       return
     }
+    // Pojedyncza generacja też jest przerywalna: ustawia flagę running,
+    // dzięki czemu przycisk Stop jest widoczny i działa (z QA to do 3 generacji).
+    cancelRef.current = false
+    setRunning(true)
     const id = cellId(finishKey, valveKey)
     const prompt = buildComposePrompt(finishKey, valveKey)
     patchCell(id, { status: 'running', error: null, prompt, sections, qa: null, verify: null })
@@ -665,8 +728,16 @@ export default function App() {
         noteCellId: id,
       })
       patchCell(id, { status: 'done', img: res.img, verify: res.verify, qa: null })
+      // Retry na komórce mastera odświeża też sam master; warianty zrobione
+      // ze starego mastera są od tej chwili nieaktualne (przegeneruj krok 2).
+      if (masterMeta && cellId(masterMeta.finishKey, masterMeta.valveKey) === id) {
+        const [fitted] = await fitBudget([res.img])
+        setMasterImg(fitted)
+      }
     } catch (e) {
       patchCell(id, { status: 'error', error: e.message })
+    } finally {
+      setRunning(false)
     }
   }
 
@@ -845,13 +916,23 @@ export default function App() {
               type="file"
               accept="image/*"
               hidden
-              onChange={async (e) =>
-                e.target.files[0] &&
+              onChange={async (e) => {
+                if (!e.target.files[0]) return
                 setPackshot(await fileToDataUrl(e.target.files[0]))
-              }
+                clearMaster()
+              }}
             />
           </label>
-          {packshot && <button onClick={() => setPackshot(null)}>Remove</button>}
+          {packshot && (
+            <button
+              onClick={() => {
+                setPackshot(null)
+                clearMaster()
+              }}
+            >
+              Remove
+            </button>
+          )}
         </div>
         {packshot && (
           <img
@@ -989,6 +1070,7 @@ export default function App() {
                   if (!e.target.files[0]) return
                   setPlate(await fileToDataUrl(e.target.files[0]))
                   setPlateOrigin('own')
+                  clearMaster()
                 }}
               />
             </label>
@@ -1306,12 +1388,23 @@ export default function App() {
         <div className="row">
           <button
             className="primary"
-            onClick={runSeries}
+            onClick={runMaster}
             disabled={running || !packshot || !plate || totalCells === 0}
           >
-            {running
-              ? `Generating… (${doneCount}/${totalCells})`
-              : `Generate series (${totalCells} images)`}
+            {running && !masterImg
+              ? 'Generating master…'
+              : masterImg
+                ? 'Regenerate master frame'
+                : '1. Generate master frame'}
+          </button>
+          <button
+            className="primary"
+            onClick={runVariants}
+            disabled={running || !masterImg || totalCells < 2}
+          >
+            {running && masterImg
+              ? `Generating variants… (${doneCount}/${totalCells})`
+              : `2. Generate variants from master (${Math.max(totalCells - 1, 0)} images)`}
           </button>
           {running && (
             <button onClick={() => (cancelRef.current = true)}>Stop</button>
@@ -1320,6 +1413,9 @@ export default function App() {
             <button onClick={downloadAll}>Download all (ZIP)</button>
           )}
         </div>
+        <p className="hint">
+          Step 1 composes the master: first selected finish with the first selected valve variant, straight from the packshot. Inspect it (section count, casting design, QA badge) and use Retry until it is right; every variant inherits its frame and geometry. Step 2 turns the approved master into the remaining finish and valve variants. Changing the packshot or the interior clears the master.
+        </p>
 
         <div className="grid">
           {plan.flatMap((p) =>
