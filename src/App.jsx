@@ -159,7 +159,7 @@ const sectionsEnum = (n) =>
 const cellId = (finishKey, valveKey) => `${finishKey}__${valveKey}`
 
 // Podbijaj przy każdej zmianie, widoczne w nagłówku appki:
-const APP_VERSION = 'v5.11'
+const APP_VERSION = 'v6.0'
 
 // Auto-QA: maksymalna liczba prób generacji jednego kadru (1 + ponowienia)
 const QA_MAX_ATTEMPTS = 3
@@ -174,7 +174,7 @@ const styleThumb = (key) => `${import.meta.env.BASE_URL}styles/${key}.jpg`
 // żeby po zmianie domyślnych w repo wszyscy wystartowali od aktualnych.
 // v7: packshot jest źródłem prawdy także o PROPORCJACH (usunięte "low,
 // knee height" z czasów Short Ascota; wysokość produktu z referencji).
-const PROMPTS_LS_KEY = 'radiator-studio-prompts-v24'
+const PROMPTS_LS_KEY = 'radiator-studio-prompts-v26'
 const SECTIONS_LS_KEY = 'radiator-studio-sections'
 const STYLE_LS_KEY = 'radiator-studio-style'
 const FRAME_LS_KEY = 'radiator-studio-frame'
@@ -400,6 +400,26 @@ export default function App() {
       .replaceAll('{SECTIONS}', String(sections))
       .replaceAll('{SECTIONS_WORD}', SECTION_WORDS[sections] || String(sections))
 
+  // Głosowanie QA (v5.12): 3 niezależne odczyty tego samego kadru, mediana
+  // liczby sekcji, większość dla design_match. Pojedynczy odczyt VLM myli się
+  // o +/-2 przy 8+ sekcjach; mediana z trzech tnie ten szum. Koszt: 3 tanie
+  // wywołania tekstowe na próbę.
+  const verifyVoted = async (prompt, images) => {
+    const votes = (
+      await Promise.all([0, 1, 2].map(() => verifyJson(prompt, images)))
+    ).filter((v) => v && Number.isFinite(Number(v.sections)))
+    if (!votes.length) return null
+    const counts = votes.map((v) => Number(v.sections)).sort((a, b) => a - b)
+    const median = counts[Math.floor(counts.length / 2)]
+    const designVotes = votes
+      .map((v) => v.design_match)
+      .filter((d) => d === true || d === false)
+    const designMatch = designVotes.length
+      ? designVotes.filter(Boolean).length * 2 > designVotes.length
+      : undefined
+    return { sections: median, design_match: designMatch }
+  }
+
   // checkDesign: packshot (dataURL) => QA porównuje też wzór; null => tylko liczba
   const generateVerified = async (basePrompt, inputs, { checkDesign = null, noteCellId = null } = {}) => {
     if (!verifyOn) return { img: await generateImage(basePrompt, inputs), verify: null }
@@ -411,7 +431,7 @@ export default function App() {
         inputs,
       )
       const [imgSmall] = await fitBudget([img])
-      const v = await verifyJson(
+      const v = await verifyVoted(
         checkDesign ? prompts.verifyMaster : prompts.verifyCount,
         checkDesign ? [imgSmall, checkDesign] : [imgSmall],
       )
@@ -816,7 +836,7 @@ export default function App() {
       <section className="card">
         <h2>Step 1: Product packshot</h2>
         <p className="hint">
-          A product photo from the shop, ideally cut out on white. This is the source of truth for the casting geometry; the model is forbidden to change it. The image is automatically scaled to 1600 px before sending.
+          A product photo from the shop, ideally cut out on white. The radiator is transplanted into the interior 1:1, INCLUDING its section count, so upload the packshot of the exact SKU you want to show. The image is automatically scaled to 1600 px before sending.
         </p>
         <div className="row">
           <label className="upload-btn">
@@ -1233,7 +1253,7 @@ export default function App() {
               ))}
             </select>
             <p className="hint">
-              The selector is AUTHORITATIVE: the model builds exactly this many sections regardless of how many the packshot shows; the packshot defines only the design. Counts far from the packshot may need a retry or two.
+              The radiator is transferred 1:1 from the packshot, so the section count comes from the packshot itself. Set this selector to MATCH the packshot: it steers only the Auto-QA check and the file names, not the generation.
             </p>
           </div>
           <div>

@@ -170,9 +170,7 @@ export const SECTION_VARIANTS = [
 
 // --- Wspólne fragmenty szablonów kompozycji ----------------------------------
 
-const PRODUCT_PARA = `THE RADIATOR HAS EXACTLY {SECTIONS} ({SECTIONS_WORD}) SECTIONS. {SECTIONS_ENUM} The section count comes ONLY from this instruction. Image [2] may show a radiator with a different number of sections; its count carries no weight at all, only its design does.
-
-For everything else, image [2] is the single source of truth for the radiator's design AND its proportions. Copy one to one: the silhouette, the real height-to-width proportions of a SINGLE section, the exact profile and curvature of the columns, the shape of the top and bottom collars, the shape of its feet, and the valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the corresponding sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten or stylise any part of it. Build the radiator by repeating the single-section design from image [2] exactly {SECTIONS} times, evenly spaced, approximately {WIDTH_MM} mm wide in total: {WIDTH_NOTE} It is a sectional cast iron column radiator; the number of columns in depth, and the front-to-back profile, follow image [2] exactly.`
+const PRODUCT_PARA = `Image [2] shows the one physical object this task is about. It is not inspiration and not a style guide: it is the very radiator that must appear in the room, transplanted one to one, as if the same object had been carried into this room and photographed there. Copy it exactly as it is: the same sections exactly as image [2] shows them, adding none and removing none; the same silhouette and real height-to-width proportions; the exact profile and curvature of the columns; the shape of the top and bottom collars; the shape of its feet; and the valve bosses at the bottom outer corners. The surface decoration comes ONLY from image [2]: if the sections in image [2] carry raised ornament, reproduce that ornament identically on the corresponding sections; if the sections in image [2] are plain and smooth, render them plain and smooth, with no engraving, relief, pattern or decoration added anywhere. Do not redesign, modernise, simplify, slim down, squash, shorten, widen or stylise any part of it, and never substitute a different radiator from memory. The number of columns in depth, and the front-to-back profile, follow image [2] exactly.`
 
 // --- Bloki zaworów: wybierane AUTOMATYCZNIE przez appkę --------------------
 // generic: brak zdjęcia zaworu; refSingle: zdjęcie z jednym zaworem;
@@ -192,9 +190,9 @@ const LIGHT_PARA = `Integrate the radiator into the photograph seamlessly. Follo
 // Plate ze szkieletu zawsze ma okno, pustą ścianę i rurki, więc szablon może
 // się do nich odwoływać wprost.
 
-export const COMPOSE_STYLED = `TASK: add ONE cast iron radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections into the photograph below. The section count {SECTIONS} is the single most important requirement of this task.
+export const COMPOSE_STYLED = `TASK: transplant the exact cast iron radiator shown in image [2] into the photograph in image [1], one to one. Reproducing the radiator from image [2] faithfully, without changing it in any way, is the single most important requirement of this task.
 
-Image [1] is a photograph of an interior. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph, standing on the floor against the wall directly beneath the window. This is an edit of image [1], not a new scene.
+Image [1] is a photograph of an interior. Image [2] is the product photo of the radiator itself. EDIT IMAGE [1]: place this radiator into the photograph, standing on the floor against the wall directly beneath the window. This is an edit of image [1], not a new scene.
 
 ${PRODUCT_PARA}
 
@@ -211,9 +209,9 @@ The finish of the radiator body: {FINISH}`
 // --- KROK 2b: kompozycja dla WŁASNEGO ZDJĘCIA (wnętrze dowolne) --------------
 // Zero założeń o pokoju: bez okna, bez parkietu, bez kierunku światła.
 
-export const COMPOSE_OWN = `TASK: add ONE cast iron radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections into the photograph below. The section count {SECTIONS} is the single most important requirement of this task.
+export const COMPOSE_OWN = `TASK: transplant the exact cast iron radiator shown in image [2] into the photograph in image [1], one to one. Reproducing the radiator from image [2] faithfully, without changing it in any way, is the single most important requirement of this task.
 
-Image [1] is a photograph of a real room. Image [2] is a product reference photo of a cast iron radiator. EDIT IMAGE [1]: add the radiator from image [2] into the photograph. It stands on the floor against a clear stretch of wall visible in image [1]: beneath the window if there is one, otherwise in the most natural empty spot for a radiator. This is an edit of the photograph, not a new scene.
+Image [1] is a photograph of a real room. Image [2] is the product photo of the radiator itself. EDIT IMAGE [1]: place this radiator into the photograph. It stands on the floor against a clear stretch of wall visible in image [1]: beneath the window if there is one, otherwise in the most natural empty spot for a radiator. This is an edit of the photograph, not a new scene.
 
 ${PRODUCT_PARA}
 
@@ -260,17 +258,21 @@ export const SWAP_REF_PAIR = `Image [2] is the exact product reference for the v
 
 export const VERIFY_MASTER = `You are a meticulous quality inspector. Image [1] is a generated interior photograph containing exactly one cast iron radiator. Image [2] is the product packshot of the radiator that was supposed to be reproduced.
 
-First, count the vertical sections of the radiator in image [1] one by one, carefully. Count the repeating cast columns themselves, not the gaps between them. Then judge whether the radiator in image [1] follows the DESIGN of image [2]: the same section profile and column shape, the same foot design, and the same level of surface decoration (a plain reference stays plain, a decorated reference stays decorated). When judging the design, ignore the colour, the finish and the number of sections.
+Count the sections of the radiator in image [1] by their TOP CAPS: every section ends in one rounded cap on the radiator's top rail. Scan the top rail slowly from the leftmost cap to the rightmost cap and record every single cap, including caps that are in shadow, dark against a dark wall, or partly cropped by the frame edge. For each cap record its approximate horizontal position as a percentage of the radiator's width (leftmost cap near 0, rightmost near 100). The number of caps IS the number of sections; do not estimate the count any other way.
 
-Answer with JSON only, no other text: {"sections": <integer>, "design_match": <true or false>}`
+Then judge whether the radiator in image [1] follows the DESIGN of image [2]: the same section profile and column shape, the same foot design, and the same level of surface decoration (a plain reference stays plain, a decorated reference stays decorated). When judging the design, ignore the colour, the finish and the number of sections.
 
-export const VERIFY_COUNT = `You are a meticulous quality inspector. The image is an interior photograph containing exactly one cast iron radiator. Count the vertical sections of the radiator one by one, carefully. Count the repeating cast columns themselves, not the gaps between them.
+Answer with JSON only, no other text: {"caps": [<one percentage per cap, left to right>], "sections": <integer equal to the length of "caps">, "design_match": <true or false>}`
 
-Answer with JSON only, no other text: {"sections": <integer>}`
+export const VERIFY_COUNT = `You are a meticulous quality inspector. The image is an interior photograph containing exactly one cast iron radiator.
+
+Count the sections of the radiator by their TOP CAPS: every section ends in one rounded cap on the radiator's top rail. Scan the top rail slowly from the leftmost cap to the rightmost cap and record every single cap, including caps that are in shadow, dark against a dark wall, or partly cropped by the frame edge. For each cap record its approximate horizontal position as a percentage of the radiator's width (leftmost cap near 0, rightmost near 100). The number of caps IS the number of sections; do not estimate the count any other way.
+
+Answer with JSON only, no other text: {"caps": [<one percentage per cap, left to right>], "sections": <integer equal to the length of "caps">}`
 
 // Dopiski korygujące doklejane do prompta przy ponowieniu po odrzuceniu przez QA.
 // {GOT} = ile sekcji wyszło, {SECTIONS}/{SECTIONS_WORD} = ile ma być.
 
-export const RETRY_NOTE_COUNT = `PREVIOUS ATTEMPT REJECTED BY QA: the radiator was built with {GOT} sections instead of {SECTIONS}. That is wrong. Build the radiator with EXACTLY {SECTIONS} ({SECTIONS_WORD}) sections this time, and recount them one by one before finishing.`
+export const RETRY_NOTE_COUNT = `PREVIOUS ATTEMPT REJECTED BY QA: the rendered radiator ended up with {GOT} sections, which does not match the radiator in image [2] ({SECTIONS} sections). You changed the object. Look at image [2] again and copy its radiator one to one, with exactly the sections it shows, adding none and removing none, before finishing.`
 
 export const RETRY_NOTE_DESIGN = `PREVIOUS ATTEMPT REJECTED BY QA: the radiator did not follow the reference design in image [2]. Copy the section profile, column shape, foot design and surface decoration of image [2] exactly; a plain reference stays plain. Do not substitute a generic radiator design from memory.`
